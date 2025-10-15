@@ -1,0 +1,2600 @@
+'use client';
+
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const MapPickerSimple = dynamic(() => import('@/components/MapPickerSimple'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-96">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading map...</p>
+      </div>
+    </div>
+  )
+});
+import PersonIcon from '@mui/icons-material/Person';
+import WorkIcon from '@mui/icons-material/Work';
+import ShareIcon from '@mui/icons-material/Share';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import CollectionsIcon from '@mui/icons-material/Collections';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import InfoIcon from '@mui/icons-material/Info';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import XIcon from '@mui/icons-material/X';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import YouTubeIcon from '@mui/icons-material/YouTube';
+import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { Leaderboard } from '@mui/icons-material';
+
+// Icon aliases
+const Person = PersonIcon;
+const Briefcase = WorkIcon;
+const Share = ShareIcon;
+const Camera = PhotoCameraIcon;
+const Collections = CollectionsIcon;
+const CheckCircle = CheckCircleIcon;
+const Plus = AddIcon;
+const X2 = CloseIcon;
+const Upload = CloudUploadIcon;
+const Info = InfoIcon;
+const LinkedIn = LinkedInIcon;
+const Instagram = InstagramIcon;
+const Facebook = FacebookIcon;
+const Twitter = XIcon;
+const GitHub = GitHubIcon;
+const YouTube = YouTubeIcon;
+const Search = SearchIcon;
+const Edit = EditIcon;
+const Trash = DeleteIcon;
+
+interface ProfileData {
+  // Basic Information
+  firstName: string;
+  lastName: string;
+  primaryEmail: string;
+  secondaryEmail: string;
+  mobileNumber: string;
+  whatsappNumber: string;
+  showEmailPublicly: boolean;
+  showMobilePublicly: boolean;
+  showWhatsappPublicly: boolean;
+
+  // Professional Information
+  jobTitle: string;
+  companyName: string;
+  companyWebsite: string;
+  companyAddress: string;
+  companyLogo: string | null;
+  industry: string;
+  subDomain: string;
+  skills: string[];
+  professionalSummary: string;
+  showJobTitle: boolean;
+  showCompanyName: boolean;
+  showCompanyWebsite: boolean;
+  showCompanyAddress: boolean;
+  showIndustry: boolean;
+  showSkills: boolean;
+
+  // Social & Digital Presence
+  linkedinUrl: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  twitterUrl: string;
+  behanceUrl: string;
+  dribbbleUrl: string;
+  githubUrl: string;
+  youtubeUrl: string;
+  showLinkedin: boolean;
+  showInstagram: boolean;
+  showFacebook: boolean;
+  showTwitter: boolean;
+  showBehance: boolean;
+  showDribbble: boolean;
+  showGithub: boolean;
+  showYoutube: boolean;
+
+  // Profile Photo & Background
+  profilePhoto: string | null;
+  backgroundImage: string | null;
+  showProfilePhoto: boolean;
+  showBackgroundImage: boolean;
+
+  // Media Gallery
+  photos: Array<{ id: string; url: string; title: string; showPublicly: boolean }>;
+  videos: Array<{ id: string; url: string; title: string; showPublicly: boolean }>;
+}
+
+// Job title options with categories
+const JOB_TITLES = [
+  { category: 'General / Corporate', titles: [
+    'Chief Executive Officer (CEO)', 'Chief Operating Officer (COO)', 'Chief Financial Officer (CFO)',
+    'Chief Technology Officer (CTO)', 'Chief Marketing Officer (CMO)', 'Chief Product Officer (CPO)',
+    'Vice President', 'Director', 'Manager', 'Team Lead', 'Coordinator', 'Analyst', 'Associate', 'Intern'
+  ]},
+  { category: 'Technical / IT', titles: [
+    'Software Engineer', 'Data Scientist', 'Data Engineer', 'Cloud Architect', 'DevOps Engineer',
+    'Cybersecurity Analyst', 'Machine Learning Engineer', 'Full Stack Developer', 'QA Engineer',
+    'Systems Administrator', 'Product Manager (Tech)', 'Technical Program Manager'
+  ]},
+  { category: 'Creative / Marketing', titles: [
+    'Marketing Manager', 'Content Strategist', 'SEO Specialist', 'Social Media Manager',
+    'Graphic Designer', 'UI/UX Designer', 'Brand Manager', 'Copywriter', 'Art Director'
+  ]},
+  { category: 'Sales / Customer', titles: [
+    'Sales Executive', 'Account Manager', 'Business Development Manager', 'Customer Success Manager',
+    'Inside Sales Representative', 'Territory Sales Manager'
+  ]},
+  { category: 'Finance / Legal / HR', titles: [
+    'Financial Analyst', 'Accountant', 'Investment Analyst', 'HR Manager',
+    'Talent Acquisition Specialist', 'Legal Counsel', 'Compliance Officer', 'Payroll Specialist'
+  ]},
+  { category: 'Operations / Logistics', titles: [
+    'Operations Manager', 'Supply Chain Analyst', 'Procurement Specialist',
+    'Logistics Coordinator', 'Quality Assurance Manager'
+  ]},
+  { category: 'Healthcare / Science', titles: [
+    'Physician', 'Nurse', 'Pharmacist', 'Medical Researcher',
+    'Laboratory Technician', 'Clinical Data Manager'
+  ]},
+  { category: 'Education / Nonprofit', titles: [
+    'Teacher', 'Professor', 'Instructional Designer', 'Research Associate',
+    'Program Coordinator', 'Fundraising Manager'
+  ]}
+];
+
+// Industry options
+const INDUSTRIES = [
+  'Information Technology',
+  'Finance & Banking',
+  'Healthcare & Life Sciences',
+  'Education',
+  'Manufacturing',
+  'Retail & E-commerce',
+  'Transportation & Logistics',
+  'Energy & Utilities',
+  'Real Estate & Construction',
+  'Telecommunications',
+  'Media & Entertainment',
+  'Agriculture',
+  'Government & Public Sector',
+  'Nonprofit & NGOs',
+  'Hospitality & Travel'
+];
+
+// Sub-domain options with industry mapping
+const SUB_DOMAINS = [
+  { industry: 'Information Technology', subDomains: [
+    'Software Development', 'Artificial Intelligence / Machine Learning', 'Cloud Computing',
+    'Cybersecurity', 'IT Services', 'Data Analytics', 'SaaS / Product Development'
+  ]},
+  { industry: 'Finance & Banking', subDomains: [
+    'Investment Banking', 'Retail Banking', 'FinTech', 'Insurance',
+    'Accounting & Audit', 'Asset Management'
+  ]},
+  { industry: 'Healthcare & Life Sciences', subDomains: [
+    'Hospitals & Clinics', 'Pharmaceuticals', 'Biotechnology', 'Medical Devices',
+    'HealthTech', 'Clinical Research'
+  ]},
+  { industry: 'Education', subDomains: [
+    'K-12', 'Higher Education', 'EdTech', 'Vocational Training', 'Corporate Learning'
+  ]},
+  { industry: 'Manufacturing', subDomains: [
+    'Automotive', 'Electronics', 'Consumer Goods', 'Industrial Equipment', 'Aerospace'
+  ]},
+  { industry: 'Retail & E-commerce', subDomains: [
+    'Online Marketplaces', 'Fashion & Apparel', 'Food & Beverage',
+    'Consumer Electronics', 'Supply Chain'
+  ]},
+  { industry: 'Transportation & Logistics', subDomains: [
+    'Shipping & Freight', 'Warehousing', 'Supply Chain Management', 'Mobility / Ride Sharing'
+  ]},
+  { industry: 'Energy & Utilities', subDomains: [
+    'Oil & Gas', 'Renewable Energy', 'Power Generation', 'Waste Management', 'Water Utilities'
+  ]},
+  { industry: 'Real Estate & Construction', subDomains: [
+    'Residential', 'Commercial', 'Architecture & Design', 'Property Management'
+  ]},
+  { industry: 'Telecommunications', subDomains: [
+    'Mobile Networks', 'Internet Service Providers', 'Cloud Communication', '5G / Fiber Infrastructure'
+  ]},
+  { industry: 'Media & Entertainment', subDomains: [
+    'Film & Television', 'Gaming', 'Publishing', 'Advertising', 'Music Industry'
+  ]},
+  { industry: 'Agriculture', subDomains: [
+    'Agritech', 'Food Processing', 'Livestock Management', 'Organic Farming'
+  ]},
+  { industry: 'Government & Public Sector', subDomains: [
+    'Defense', 'Infrastructure', 'Public Policy', 'Civil Services'
+  ]},
+  { industry: 'Hospitality & Travel', subDomains: [
+    'Hotels & Resorts', 'Tourism', 'Airlines', 'Food Services'
+  ]}
+];
+
+// Flatten all sub-domains for searching
+const ALL_SUB_DOMAINS = SUB_DOMAINS.flatMap(group => group.subDomains);
+
+function ProfileBuilderContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const profileId = searchParams.get('id');
+
+  const [activeSection, setActiveSection] = useState<'basic' | 'professional' | 'social' | 'media-photo' | 'media-gallery'>('basic');
+  const [skillInput, setSkillInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [mobileCountryCode, setMobileCountryCode] = useState('+971');
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState('+971');
+  const [useSameNumberForWhatsapp, setUseSameNumberForWhatsapp] = useState(false);
+  const [showJobTitleDropdown, setShowJobTitleDropdown] = useState(false);
+  const [showIndustryDropdown, setShowIndustryDropdown] = useState(false);
+  const [showSubDomainDropdown, setShowSubDomainDropdown] = useState(false);
+
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: '',
+    lastName: '',
+    primaryEmail: '',
+    secondaryEmail: '',
+    mobileNumber: '',
+    whatsappNumber: '',
+    showEmailPublicly: true,
+    showMobilePublicly: true,
+    showWhatsappPublicly: false,
+
+    jobTitle: '',
+    companyName: '',
+    companyWebsite: '',
+    companyAddress: '',
+    companyLogo: null,
+    industry: '',
+    subDomain: '',
+    skills: [],
+    professionalSummary: '',
+    showJobTitle: true,
+    showCompanyName: true,
+    showCompanyWebsite: true,
+    showCompanyAddress: true,
+    showIndustry: true,
+    showSkills: true,
+
+    linkedinUrl: '',
+    instagramUrl: '',
+    facebookUrl: '',
+    twitterUrl: '',
+    behanceUrl: '',
+    dribbbleUrl: '',
+    githubUrl: '',
+    youtubeUrl: '',
+    showLinkedin: false,
+    showInstagram: false,
+    showFacebook: false,
+    showTwitter: false,
+    showBehance: false,
+    showDribbble: false,
+    showGithub: false,
+    showYoutube: false,
+
+    profilePhoto: null,
+    backgroundImage: null,
+    showProfilePhoto: true,
+    showBackgroundImage: true,
+
+    photos: [],
+    videos: []
+  });
+
+  // File input ref for photo uploads
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper function to resize image if it exceeds 5MB
+  const resizeImage = async (file: File): Promise<File> => {
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+
+    // If file is already under 5MB, return it as-is
+    if (file.size <= MAX_SIZE) {
+      return file;
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+
+          // Calculate new dimensions to reduce file size
+          let width = img.width;
+          let height = img.height;
+          const ratio = file.size / MAX_SIZE;
+          const scale = Math.sqrt(1 / ratio) * 0.9; // 0.9 to ensure we're under the limit
+
+          width = Math.floor(width * scale);
+          height = Math.floor(height * scale);
+
+          canvas.width = width;
+          canvas.height = height;
+
+          // Draw resized image
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert canvas to blob with reduced quality
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to create blob'));
+                return;
+              }
+
+              // Create new file from blob
+              const resizedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: Date.now(),
+              });
+
+              console.log(`Image resized from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(resizedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              resolve(resizedFile);
+            },
+            file.type,
+            0.8 // Quality (0.8 = 80%)
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+    });
+  };
+
+  // Handle photo file upload
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, etc.)');
+      return;
+    }
+
+    try {
+      // Resize image if needed
+      let processedFile = file;
+      if (file.size > MAX_SIZE) {
+        console.log(`File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds 5MB. Resizing...`);
+        processedFile = await resizeImage(file);
+      }
+
+      // Create a temporary URL for preview
+      const imageUrl = URL.createObjectURL(processedFile);
+
+      // Add photo to profile data
+      const newPhoto = {
+        id: Date.now().toString(),
+        url: imageUrl,
+        title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+        showPublicly: true
+      };
+
+      setProfileData({
+        ...profileData,
+        photos: [...profileData.photos, newPhoto]
+      });
+
+      // TODO: Upload to storage server (Supabase, S3, etc.)
+      // This is where you would upload processedFile to your storage
+
+    } catch (error) {
+      console.error('Error processing image:', error);
+      alert('Failed to process image. Please try again.');
+    }
+
+    // Reset input
+    event.target.value = '';
+  };
+
+  // Fetch existing profile data on component mount
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        console.log('🔄 Starting profile data fetch from DATABASE...');
+        console.log('📋 Profile ID from URL:', profileId);
+
+        // Fetch profiles from database
+        const profileResponse = await fetch('/api/profiles');
+
+        if (profileResponse.ok) {
+          const result = await profileResponse.json();
+          console.log('📦 Database response:', result);
+
+          if (result.success && result.profiles && result.profiles.length > 0) {
+            let profileToEdit = null;
+
+            // If profileId is provided in URL, find that specific profile
+            if (profileId) {
+              profileToEdit = result.profiles.find((p: any) => p.id === profileId);
+              console.log('🔍 Looking for profile with ID:', profileId);
+            } else {
+              // Otherwise, get the first (most recent) profile
+              profileToEdit = result.profiles[0];
+              console.log('🔍 Using most recent profile');
+            }
+
+            if (profileToEdit) {
+              console.log('✅ Found profile from database:', profileToEdit);
+              console.log('🏢 Company Logo URL from DB:', profileToEdit.company_logo_url);
+
+              // Parse social_links if it's a JSON string
+              let socialLinks = {};
+              if (typeof profileToEdit.social_links === 'string') {
+                try {
+                  socialLinks = JSON.parse(profileToEdit.social_links);
+                } catch (e) {
+                  console.error('Failed to parse social_links:', e);
+                }
+              } else if (profileToEdit.social_links) {
+                socialLinks = profileToEdit.social_links;
+              }
+
+              // Map database profile structure to builder structure
+              const mappedProfile = {
+                firstName: profileToEdit.first_name || '',
+                lastName: profileToEdit.last_name || '',
+                primaryEmail: profileToEdit.email || '',
+                secondaryEmail: profileToEdit.alternate_email || '',
+                mobileNumber: profileToEdit.phone_number || '',
+                whatsappNumber: profileToEdit.whatsapp || '',
+                showEmailPublicly: profileToEdit.show_email_publicly ?? true,
+                showMobilePublicly: profileToEdit.show_mobile_publicly ?? true,
+                showWhatsappPublicly: profileToEdit.show_whatsapp_publicly ?? false,
+
+                jobTitle: profileToEdit.job_title || profileToEdit.title || '',
+                companyName: profileToEdit.company || profileToEdit.company_name || '',
+                companyWebsite: profileToEdit.company_website || '',
+                companyAddress: profileToEdit.company_address || profileToEdit.location || '',
+                companyLogo: profileToEdit.company_logo_url || null,
+                industry: profileToEdit.industry || '',
+                subDomain: profileToEdit.sub_domain || '',
+                skills: Array.isArray(profileToEdit.skills) ? profileToEdit.skills : [],
+                professionalSummary: profileToEdit.professional_summary || profileToEdit.bio || '',
+                showJobTitle: profileToEdit.show_job_title ?? true,
+                showCompanyName: profileToEdit.show_company_name ?? true,
+                showCompanyWebsite: profileToEdit.show_company_website ?? true,
+                showCompanyAddress: profileToEdit.show_company_address ?? true,
+                showIndustry: profileToEdit.show_industry ?? true,
+                showSkills: profileToEdit.show_skills ?? true,
+
+                linkedinUrl: (socialLinks as any)?.linkedin || '',
+                instagramUrl: (socialLinks as any)?.instagram || '',
+                facebookUrl: (socialLinks as any)?.facebook || '',
+                twitterUrl: (socialLinks as any)?.twitter || '',
+                behanceUrl: (socialLinks as any)?.behance || '',
+                dribbbleUrl: (socialLinks as any)?.dribbble || '',
+                githubUrl: (socialLinks as any)?.github || '',
+                youtubeUrl: (socialLinks as any)?.youtube || '',
+                showLinkedin: profileToEdit.show_linkedin ?? Boolean((socialLinks as any)?.linkedin),
+                showInstagram: profileToEdit.show_instagram ?? Boolean((socialLinks as any)?.instagram),
+                showFacebook: profileToEdit.show_facebook ?? Boolean((socialLinks as any)?.facebook),
+                showTwitter: profileToEdit.show_twitter ?? Boolean((socialLinks as any)?.twitter),
+                showBehance: profileToEdit.show_behance ?? false,
+                showDribbble: profileToEdit.show_dribbble ?? false,
+                showGithub: profileToEdit.show_github ?? false,
+                showYoutube: profileToEdit.show_youtube ?? Boolean((socialLinks as any)?.youtube),
+
+                profilePhoto: profileToEdit.profile_photo_url || profileToEdit.avatar_url || null,
+                backgroundImage: profileToEdit.background_image_url || null,
+                showProfilePhoto: profileToEdit.show_profile_photo ?? true,
+                showBackgroundImage: profileToEdit.show_background_image ?? true,
+
+                photos: Array.isArray(profileToEdit.gallery_urls) ? profileToEdit.gallery_urls.map((url: string, index: number) => ({
+                  id: `photo-${index}`,
+                  url,
+                  title: '',
+                  showPublicly: true
+                })) : [],
+                videos: Array.isArray(profileToEdit.video_urls) ? profileToEdit.video_urls.map((url: string, index: number) => ({
+                  id: `video-${index}`,
+                  url,
+                  title: '',
+                  showPublicly: true
+                })) : []
+              };
+
+              setProfileData(mappedProfile);
+              console.log('✅ Profile data loaded from database');
+              console.log('🏢 Mapped Company Logo:', mappedProfile.companyLogo);
+              return; // Exit early, we have the data
+            }
+          } else {
+            console.log('ℹ️ No profiles found in database, checking localStorage...');
+          }
+        }
+
+        // First check localStorage for various data sources
+        const nfcConfigStr = localStorage.getItem('nfcConfig');
+        const userProfileStr = localStorage.getItem('userProfile');
+        const userContactDataStr = localStorage.getItem('userContactData');
+
+        console.log('💾 LocalStorage nfcConfig:', nfcConfigStr);
+        console.log('💾 LocalStorage userProfile:', userProfileStr);
+        console.log('💾 LocalStorage userContactData:', userContactDataStr);
+
+        // Priority order: userContactData (most recent from checkout) > nfcConfig > userProfile
+        let mergedData: any = {};
+
+        // Start with nfcConfig
+        if (nfcConfigStr) {
+          try {
+            const config = JSON.parse(nfcConfigStr);
+            console.log('✅ Found nfcConfig data:', config);
+            mergedData = {
+              firstName: config.firstName,
+              lastName: config.lastName,
+              primaryEmail: config.email,
+            };
+          } catch (e) {
+            console.error('❌ Error parsing nfcConfig:', e);
+          }
+        }
+
+        // Override with userProfile if available
+        if (userProfileStr) {
+          try {
+            const userProfile = JSON.parse(userProfileStr);
+            console.log('✅ Found userProfile data:', userProfile);
+            mergedData = {
+              ...mergedData,
+              firstName: userProfile.firstName || mergedData.firstName,
+              lastName: userProfile.lastName || mergedData.lastName,
+              primaryEmail: userProfile.email || mergedData.primaryEmail,
+              mobileNumber: userProfile.phone || userProfile.mobile || mergedData.mobileNumber,
+            };
+          } catch (e) {
+            console.error('❌ Error parsing userProfile:', e);
+          }
+        }
+
+        // Override with userContactData (highest priority - most recent)
+        if (userContactDataStr) {
+          try {
+            const userContactData = JSON.parse(userContactDataStr);
+            console.log('✅ Found userContactData (from checkout):', userContactData);
+            mergedData = {
+              ...mergedData,
+              firstName: userContactData.firstName || mergedData.firstName,
+              lastName: userContactData.lastName || mergedData.lastName,
+              primaryEmail: userContactData.email || mergedData.primaryEmail,
+              mobileNumber: userContactData.phone || mergedData.mobileNumber,
+            };
+          } catch (e) {
+            console.error('❌ Error parsing userContactData:', e);
+          }
+        }
+
+        // Apply merged data to profile
+        if (Object.keys(mergedData).length > 0) {
+          // Parse phone number to detect and remove country code if present
+          let cleanedPhoneNumber = mergedData.mobileNumber || '';
+          let detectedCountryCode = '+971'; // Default to UAE
+
+          if (cleanedPhoneNumber) {
+            // Detect country code
+            if (cleanedPhoneNumber.startsWith('+91')) {
+              detectedCountryCode = '+91';
+              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+91/, '').trim();
+            } else if (cleanedPhoneNumber.startsWith('+971')) {
+              detectedCountryCode = '+971';
+              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+971/, '').trim();
+            } else if (cleanedPhoneNumber.startsWith('+1')) {
+              detectedCountryCode = '+1';
+              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+1/, '').trim();
+            } else if (cleanedPhoneNumber.startsWith('+')) {
+              // Extract any other country code
+              const match = cleanedPhoneNumber.match(/^\+(\d+)/);
+              if (match) {
+                detectedCountryCode = '+' + match[1];
+                cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+\d+/, '').trim();
+              }
+            }
+
+            console.log('📞 Original phone:', mergedData.mobileNumber);
+            console.log('📞 Detected country code:', detectedCountryCode);
+            console.log('📞 Cleaned phone:', cleanedPhoneNumber);
+
+            // Set the detected country code
+            setMobileCountryCode(detectedCountryCode);
+            setWhatsappCountryCode(detectedCountryCode);
+          }
+
+          setProfileData(prev => ({
+            ...prev,
+            firstName: mergedData.firstName || prev.firstName,
+            lastName: mergedData.lastName || prev.lastName,
+            primaryEmail: mergedData.primaryEmail || prev.primaryEmail,
+            mobileNumber: cleanedPhoneNumber || prev.mobileNumber,
+          }));
+
+          console.log('✅ Profile data populated from localStorage:', mergedData);
+        }
+
+        // Try to get user email from cookies
+        const getCookie = (name: string) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop()?.split(';').shift();
+          return null;
+        };
+
+        const userEmail = getCookie('userEmail') || (nfcConfigStr ? JSON.parse(nfcConfigStr).email : null);
+
+        console.log('👤 User email from cookie:', userEmail);
+
+        if (!userEmail) {
+          console.log('⚠️ No user email found in cookies - user needs to login first');
+          return;
+        }
+
+        console.log('🔍 Fetching profile data for:', userEmail);
+
+        const apiUrl = `/api/profiles/save?email=${encodeURIComponent(userEmail)}`;
+        console.log('📡 API URL:', apiUrl);
+
+        const response = await fetch(apiUrl);
+
+        console.log('📨 Response status:', response.status);
+        console.log('📨 Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log('⚠️ No existing profile found or error:', errorText);
+          return;
+        }
+
+        const result = await response.json();
+        console.log('📦 API result:', result);
+
+        if (result.success && result.profile) {
+          const profile = result.profile;
+          const prefs = profile.preferences || {};
+
+          console.log('✅ Profile found:', profile);
+          console.log('⚙️ Preferences:', prefs);
+
+          // Map database fields to form state
+          const mappedData = {
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            primaryEmail: profile.email || '',
+            secondaryEmail: prefs.secondaryEmail || '',
+            mobileNumber: profile.phone_number || '',
+            whatsappNumber: prefs.whatsappNumber || '',
+            showEmailPublicly: prefs.showEmailPublicly ?? true,
+            showMobilePublicly: prefs.showMobilePublicly ?? true,
+            showWhatsappPublicly: prefs.showWhatsappPublicly ?? false,
+
+            jobTitle: prefs.jobTitle || '',
+            companyName: profile.company || '',
+            companyWebsite: prefs.companyWebsite || '',
+            companyAddress: prefs.companyAddress || '',
+            companyLogo: prefs.companyLogo || null,
+            industry: prefs.industry || '',
+            subDomain: prefs.subDomain || '',
+            skills: prefs.skills || [],
+            professionalSummary: prefs.professionalSummary || '',
+            showJobTitle: prefs.showJobTitle ?? true,
+            showCompanyName: prefs.showCompanyName ?? true,
+            showCompanyWebsite: prefs.showCompanyWebsite ?? true,
+            showCompanyAddress: prefs.showCompanyAddress ?? true,
+            showIndustry: prefs.showIndustry ?? true,
+            showSkills: prefs.showSkills ?? true,
+
+            linkedinUrl: prefs.linkedinUrl || '',
+            instagramUrl: prefs.instagramUrl || '',
+            facebookUrl: prefs.facebookUrl || '',
+            twitterUrl: prefs.twitterUrl || '',
+            behanceUrl: prefs.behanceUrl || '',
+            dribbbleUrl: prefs.dribbbleUrl || '',
+            githubUrl: prefs.githubUrl || '',
+            youtubeUrl: prefs.youtubeUrl || '',
+            showLinkedin: prefs.showLinkedin ?? false,
+            showInstagram: prefs.showInstagram ?? false,
+            showFacebook: prefs.showFacebook ?? false,
+            showTwitter: prefs.showTwitter ?? false,
+            showBehance: prefs.showBehance ?? false,
+            showDribbble: prefs.showDribbble ?? false,
+            showGithub: prefs.showGithub ?? false,
+            showYoutube: prefs.showYoutube ?? false,
+
+            profilePhoto: profile.avatar_url || null,
+            backgroundImage: prefs.backgroundImage || null,
+            showProfilePhoto: prefs.showProfilePhoto ?? true,
+            showBackgroundImage: prefs.showBackgroundImage ?? true,
+
+            photos: prefs.photos || [],
+            videos: prefs.videos || []
+          };
+
+          console.log('🗺️ Mapped data:', mappedData);
+          setProfileData(mappedData);
+
+          console.log('✅ Profile data loaded successfully');
+        } else {
+          console.log('⚠️ No profile data in response');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching profile data:', error);
+      }
+    };
+
+    fetchProfileData();
+  }, [profileId]);
+
+  // Auto-update WhatsApp number when mobile number changes (if checkbox is checked)
+  useEffect(() => {
+    if (useSameNumberForWhatsapp && profileData.mobileNumber) {
+      setProfileData(prev => ({ ...prev, whatsappNumber: prev.mobileNumber }));
+    }
+  }, [profileData.mobileNumber, useSameNumberForWhatsapp]);
+
+  // Show toast notification
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  // Validate required fields for each section
+  const validateBasicInfo = () => {
+    if (!profileData.firstName.trim()) {
+      showToast('First name is required', 'error');
+      return false;
+    }
+    if (!profileData.lastName.trim()) {
+      showToast('Last name is required', 'error');
+      return false;
+    }
+    if (!profileData.primaryEmail.trim()) {
+      showToast('Primary email is required', 'error');
+      return false;
+    }
+    return true;
+  };
+
+  // Handle Continue button click for navigation
+  const handleContinue = (nextSection: 'professional' | 'social' | 'media-photo') => {
+    if (activeSection === 'basic' && !validateBasicInfo()) {
+      return;
+    }
+    setActiveSection(nextSection);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle Submit button - save to database
+  const handleSubmit = async () => {
+    if (!validateBasicInfo()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      console.log('📤 Submitting profile data...');
+
+      const response = await fetch('/api/profiles/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: profileData.primaryEmail,
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          mobileNumber: profileData.mobileNumber,
+          companyName: profileData.companyName,
+          profilePhoto: profileData.profilePhoto,
+          secondaryEmail: profileData.secondaryEmail,
+          whatsappNumber: profileData.whatsappNumber,
+          showEmailPublicly: profileData.showEmailPublicly,
+          showMobilePublicly: profileData.showMobilePublicly,
+          showWhatsappPublicly: profileData.showWhatsappPublicly,
+          jobTitle: profileData.jobTitle,
+          companyWebsite: profileData.companyWebsite,
+          companyAddress: profileData.companyAddress,
+          companyLogo: profileData.companyLogo,
+          industry: profileData.industry,
+          subDomain: profileData.subDomain,
+          skills: profileData.skills,
+          professionalSummary: profileData.professionalSummary,
+          showJobTitle: profileData.showJobTitle,
+          showCompanyName: profileData.showCompanyName,
+          showCompanyWebsite: profileData.showCompanyWebsite,
+          showCompanyAddress: profileData.showCompanyAddress,
+          showIndustry: profileData.showIndustry,
+          showSkills: profileData.showSkills,
+          linkedinUrl: profileData.linkedinUrl,
+          instagramUrl: profileData.instagramUrl,
+          facebookUrl: profileData.facebookUrl,
+          twitterUrl: profileData.twitterUrl,
+          behanceUrl: profileData.behanceUrl,
+          dribbbleUrl: profileData.dribbbleUrl,
+          githubUrl: profileData.githubUrl,
+          youtubeUrl: profileData.youtubeUrl,
+          showLinkedin: profileData.showLinkedin,
+          showInstagram: profileData.showInstagram,
+          showFacebook: profileData.showFacebook,
+          showTwitter: profileData.showTwitter,
+          showBehance: profileData.showBehance,
+          showDribbble: profileData.showDribbble,
+          showGithub: profileData.showGithub,
+          showYoutube: profileData.showYoutube,
+          backgroundImage: profileData.backgroundImage,
+          showProfilePhoto: profileData.showProfilePhoto,
+          showBackgroundImage: profileData.showBackgroundImage,
+          photos: profileData.photos,
+          videos: profileData.videos,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Profile saved successfully:', result);
+        showToast('Profile saved successfully!', 'success');
+
+        // Save to localStorage for dashboard display
+        const savedProfiles = localStorage.getItem('userProfiles');
+        const profiles = savedProfiles ? JSON.parse(savedProfiles) : [];
+
+        // Use existing profileId if editing, otherwise create new
+        const profileIdToUse = profileId || result.profile.id || Date.now().toString();
+
+        const newProfile = {
+          id: profileIdToUse,
+          name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+          title: profileData.jobTitle,
+          company: profileData.companyName,
+          email: profileData.primaryEmail,
+          phone: profileData.mobileNumber,
+          website: profileData.companyWebsite,
+          location: profileData.companyAddress,
+          bio: profileData.professionalSummary,
+          linkedin: profileData.linkedinUrl,
+          twitter: profileData.twitterUrl,
+          instagram: profileData.instagramUrl,
+          facebook: profileData.facebookUrl,
+          youtube: profileData.youtubeUrl,
+          image: profileData.profilePhoto,
+          ...profileData,
+          status: 'active' as const,
+          views: 0,
+          clicks: 0,
+          shares: 0,
+          lastUpdated: 'Just now',
+          publicUrl: `linkist.ai/${profileData.firstName.toLowerCase()}${profileData.lastName.toLowerCase()}`
+        };
+
+        // Check if profile already exists (for editing)
+        const existingIndex = profiles.findIndex((p: any) => p.id === profileIdToUse);
+        if (existingIndex >= 0) {
+          // Keep existing stats when updating
+          newProfile.views = profiles[existingIndex].views || 0;
+          newProfile.clicks = profiles[existingIndex].clicks || 0;
+          newProfile.shares = profiles[existingIndex].shares || 0;
+          profiles[existingIndex] = newProfile;
+        } else {
+          profiles.push(newProfile);
+        }
+
+        localStorage.setItem('userProfiles', JSON.stringify(profiles));
+
+        // Redirect to profile preview page
+        setTimeout(() => {
+          router.push('/profiles/preview');
+        }, 1500);
+      } else {
+        console.error('❌ Failed to save profile:', result.error);
+        showToast(result.error || 'Failed to save profile', 'error');
+      }
+    } catch (error) {
+      console.error('❌ Error saving profile:', error);
+      showToast('An error occurred while saving your profile', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveChanges = handleSubmit;
+
+  const addSkill = () => {
+    if (skillInput.trim() && !profileData.skills.includes(skillInput.trim())) {
+      // Check if maximum 5 skills reached
+      if (profileData.skills.length >= 5) {
+        showToast('Maximum 5 skills allowed', 'error');
+        return;
+      }
+      setProfileData({
+        ...profileData,
+        skills: [...profileData.skills, skillInput.trim()]
+      });
+      setSkillInput('');
+    }
+  };
+
+  const removeSkill = (skill: string) => {
+    setProfileData({
+      ...profileData,
+      skills: profileData.skills.filter(s => s !== skill)
+    });
+  };
+
+  const addPhoto = () => {
+    // Trigger the file input click
+    photoInputRef.current?.click();
+  };
+
+  const removePhoto = (id: string) => {
+    setProfileData({
+      ...profileData,
+      photos: profileData.photos.filter(p => p.id !== id)
+    });
+  };
+
+  const addVideo = () => {
+    const newVideo = {
+      id: Date.now().toString(),
+      url: '',
+      title: `Video ${profileData.videos.length + 1}`,
+      showPublicly: true
+    };
+    setProfileData({
+      ...profileData,
+      videos: [...profileData.videos, newVideo]
+    });
+  };
+
+  const sections = [
+    { id: 'basic' as const, icon: Person, label: 'Basic Information', description: 'Update your personal details and contact preferences' },
+    { id: 'professional' as const, icon: Briefcase, label: 'Professional Information', description: 'Build your professional presence and showcase your expertise' },
+    { id: 'social' as const, icon: Share, label: 'Social & Digital Presence', description: 'Connect your social media accounts and showcase your digital footprint' },
+    { id: 'media-photo' as const, icon: Camera, label: 'Profile Photo & Background', description: 'Upload and customize your profile visuals for a professional appearance' },
+    { id: 'media-gallery' as const, icon: Collections, label: 'Media Gallery', description: 'Upload photos and videos to showcase your work and achievements' }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center justify-center sm:justify-between gap-3">
+            <div className="text-center sm:text-left">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Profile Builder</h1>
+              <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">Create and manage your professional profile</p>
+            </div>
+            <div className="flex items-center gap-3 absolute right-4 sm:relative sm:right-0">
+              <button
+                onClick={handleSaveChanges}
+                className="px-4 sm:px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center gap-2 text-sm"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Save Changes</span>
+                <span className="sm:hidden">Save</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
+          {/* Sidebar Navigation - Desktop */}
+          <div className="hidden lg:block lg:col-span-1">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-24">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Sections</h3>
+              <nav className="space-y-1">
+                {sections.map((section) => (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      activeSection === section.id
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <section.icon className="w-5 h-5 mt-0.5 flex-shrink-0 text-red-600" />
+                    <span className="text-sm font-medium">{section.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Sidebar Navigation - Mobile (Horizontal Scroll) */}
+          <div className="lg:hidden mb-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">SECTIONS</h3>
+              <nav className="flex overflow-x-auto gap-2 pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
+                {sections.map((section) => (
+                  <button
+                    key={section.id}
+                    onClick={() => {
+                      setActiveSection(section.id);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors whitespace-nowrap ${
+                      activeSection === section.id
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'text-gray-700 bg-gray-50'
+                    }`}
+                  >
+                    <section.icon className="w-4 h-4 flex-shrink-0 text-red-600" />
+                    <span className="text-xs font-medium">{section.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div className="lg:col-span-3">
+            {/* Basic Information Section */}
+            {activeSection === 'basic' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-6 rounded-t-lg">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-white/10 p-2 sm:p-3 rounded-lg">
+                      <Person className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold text-white">Basic Information</h2>
+                      <p className="text-white/90 text-xs sm:text-sm mt-0.5 sm:mt-1 hidden sm:block">{sections.find(s => s.id === 'basic')?.description}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Full Name */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Full Name</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                        <input
+                          type="text"
+                          value={profileData.firstName}
+                          onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                          placeholder="Enter first name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                        <input
+                          type="text"
+                          value={profileData.lastName}
+                          onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                          placeholder="Enter last name"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email Addresses */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Email Addresses</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Primary Email *</label>
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={profileData.primaryEmail}
+                            onChange={(e) => setProfileData({ ...profileData, primaryEmail: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="Enter your email address"
+                          />
+                        </div>
+                        <div className="flex items-center justify-end mt-2">
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={profileData.showEmailPublicly}
+                                onChange={(e) => setProfileData({ ...profileData, showEmailPublicly: e.target.checked })}
+                                className="sr-only peer"
+                              />
+                              <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            </label>
+                            <span className="text-sm text-gray-700">Show publicly</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Email</label>
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={profileData.secondaryEmail}
+                            onChange={(e) => setProfileData({ ...profileData, secondaryEmail: e.target.value })}
+                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="Add secondary email"
+                          />
+                          <Plus className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phone Numbers */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Phone Numbers</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
+                        <div className="flex gap-2">
+                          <select
+                            value={mobileCountryCode}
+                            onChange={(e) => setMobileCountryCode(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white"
+                          >
+                            <option value="+971">🇦🇪 +971</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+91">🇮🇳 +91</option>
+                          </select>
+                          <div className="relative flex-1">
+                            <input
+                              type="tel"
+                              value={profileData.mobileNumber}
+                              onChange={(e) => setProfileData({ ...profileData, mobileNumber: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                              placeholder="50 123 4567"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={useSameNumberForWhatsapp}
+                              onChange={(e) => {
+                                setUseSameNumberForWhatsapp(e.target.checked);
+                                if (e.target.checked) {
+                                  setProfileData({ ...profileData, whatsappNumber: profileData.mobileNumber });
+                                  setWhatsappCountryCode(mobileCountryCode);
+                                } else {
+                                  setProfileData({ ...profileData, whatsappNumber: '' });
+                                }
+                              }}
+                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                            />
+                            <span className="text-xs text-gray-600">Use same as WhatsApp number</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={profileData.showMobilePublicly}
+                                onChange={(e) => setProfileData({ ...profileData, showMobilePublicly: e.target.checked })}
+                                className="sr-only peer"
+                              />
+                              <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            </label>
+                            <span className="text-sm text-gray-700">Show publicly</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp Number</label>
+                        <div className="flex gap-2">
+                          <select
+                            value={whatsappCountryCode}
+                            onChange={(e) => setWhatsappCountryCode(e.target.value)}
+                            disabled={useSameNumberForWhatsapp}
+                            className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none ${useSameNumberForWhatsapp ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                          >
+                            <option value="+971">🇦🇪 +971</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+91">🇮🇳 +91</option>
+                          </select>
+                          <div className="relative flex-1">
+                            <input
+                              type="tel"
+                              value={profileData.whatsappNumber}
+                              onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value })}
+                              disabled={useSameNumberForWhatsapp}
+                              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none ${useSameNumberForWhatsapp ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                              placeholder="50 123 4567"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end mt-2">
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={profileData.showWhatsappPublicly}
+                                onChange={(e) => setProfileData({ ...profileData, showWhatsappPublicly: e.target.checked })}
+                                className="sr-only peer"
+                              />
+                              <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            </label>
+                            <span className="text-sm text-gray-700">Show publicly</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Continue Button - Fixed Bottom */}
+                <div className="border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg">
+                  <div className="flex justify-center sm:justify-end">
+                    <button
+                      onClick={() => handleContinue('professional')}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                    >
+                      Continue
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Professional Information Section */}
+            {activeSection === 'professional' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-6 rounded-t-lg">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-white/10 p-2 sm:p-3 rounded-lg">
+                      <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold text-white">Professional Information</h2>
+                      <p className="text-white/90 text-xs sm:text-sm mt-0.5 sm:mt-1 hidden sm:block">{sections.find(s => s.id === 'professional')?.description}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Job Title & Role */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Job Title & Role</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Current Job Title *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={profileData.jobTitle}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, jobTitle: e.target.value });
+                            setShowJobTitleDropdown(true);
+                          }}
+                          onFocus={() => setShowJobTitleDropdown(true)}
+                          onBlur={() => {
+                            // Delay hiding to allow click on dropdown items
+                            setTimeout(() => setShowJobTitleDropdown(false), 200);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                          placeholder="Type to search or enter custom job title..."
+                        />
+
+                        {/* Live Search Dropdown - only show if there are matches */}
+                        {(() => {
+                          // Check if there are any matching job titles
+                          const hasMatches = JOB_TITLES.some(group =>
+                            group.titles.some(title =>
+                              title.toLowerCase().includes(profileData.jobTitle.toLowerCase())
+                            )
+                          );
+
+                          // Only show dropdown if there are matches
+                          if (!showJobTitleDropdown || profileData.jobTitle.length === 0 || !hasMatches) {
+                            return null;
+                          }
+
+                          return (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {JOB_TITLES.map((group) => {
+                                const filteredTitles = group.titles.filter(title =>
+                                  title.toLowerCase().includes(profileData.jobTitle.toLowerCase())
+                                );
+
+                                if (filteredTitles.length === 0) return null;
+
+                                return (
+                                  <div key={group.category}>
+                                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
+                                      {group.category}
+                                    </div>
+                                    {filteredTitles.map((title) => (
+                                      <button
+                                        key={title}
+                                        type="button"
+                                        onClick={() => {
+                                          setProfileData({ ...profileData, jobTitle: title });
+                                          setShowJobTitleDropdown(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
+                                      >
+                                        {title}
+                                      </button>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profileData.showJobTitle}
+                            onChange={(e) => setProfileData({ ...profileData, showJobTitle: e.target.checked })}
+                            className="sr-only peer"
+                          />
+                          <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                        <span className="text-sm text-gray-700">Show job title on profile</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Company Information */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Company Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
+                        <input
+                          type="text"
+                          value={profileData.companyName}
+                          onChange={(e) => setProfileData({ ...profileData, companyName: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                          placeholder="TechCorp Solutions"
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showCompanyName}
+                            onChange={(e) => setProfileData({ ...profileData, showCompanyName: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show company name</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Company Website</label>
+                        <input
+                          type="url"
+                          value={profileData.companyWebsite}
+                          onChange={(e) => setProfileData({ ...profileData, companyWebsite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                          placeholder="https://techcorp.com"
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showCompanyWebsite}
+                            onChange={(e) => setProfileData({ ...profileData, showCompanyWebsite: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show website</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Company Address</label>
+                      <input
+                        type="text"
+                        value={profileData.companyAddress}
+                        onChange={(e) => setProfileData({ ...profileData, companyAddress: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                        placeholder="Business Bay, Dubai, UAE"
+                      />
+                      <div className="flex items-center gap-2 mt-2">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                          type="checkbox"
+                          checked={profileData.showCompanyAddress}
+                          onChange={(e) => setProfileData({ ...profileData, showCompanyAddress: e.target.checked })}
+                          className="sr-only peer"
+                          />
+                          <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                        <span className="text-sm text-gray-700">Show address & map</span>
+                      </div>
+
+                      {/* Map Picker - shown when "Show address & map" is enabled */}
+                      {profileData.showCompanyAddress && (
+                        <div className="mt-4">
+                          <MapPickerSimple
+                            initialAddress={{
+                              addressLine1: profileData.companyAddress,
+                            }}
+                            onAddressChange={(address) => {
+                              setProfileData(prev => ({
+                                ...prev,
+                                companyAddress: address.displayName || `${address.addressLine1}, ${address.city}, ${address.country}`
+                              }));
+                              showToast('Location updated successfully', 'success');
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+                        <div className="w-20 h-20 sm:w-16 sm:h-16 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {profileData.companyLogo ? (
+                            <img src={profileData.companyLogo} alt="Company Logo" className="w-full h-full object-cover rounded-lg" />
+                          ) : (
+                            <svg className="w-10 h-10 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                          <input
+                            type="file"
+                            id="company-logo-upload"
+                            accept="image/png,image/jpeg,image/jpg"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setProfileData(prev => ({
+                                    ...prev,
+                                    companyLogo: reader.result as string
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById('company-logo-upload') as HTMLInputElement;
+                              if (input) {
+                                input.click();
+                              }
+                            }}
+                            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                          >
+                            <Upload className="w-4 h-4" />
+                            Upload Logo
+                          </button>
+                          <span className="text-xs text-gray-500 text-center sm:text-left">PNG, JPG up to 2MB</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Industry & Domain */}
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Industry & Domain</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Industry *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={profileData.industry}
+                            onChange={(e) => {
+                              setProfileData({ ...profileData, industry: e.target.value });
+                              setShowIndustryDropdown(true);
+                            }}
+                            onFocus={() => setShowIndustryDropdown(true)}
+                            onBlur={() => {
+                              // Delay hiding to allow click on dropdown items
+                              setTimeout(() => setShowIndustryDropdown(false), 200);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="Type to search or enter custom industry..."
+                          />
+
+                          {/* Live Search Dropdown - only show if there are matches */}
+                          {(() => {
+                            // Check if there are any matching industries
+                            const hasMatches = INDUSTRIES.some(industry =>
+                              industry.toLowerCase().includes(profileData.industry.toLowerCase())
+                            );
+
+                            // Only show dropdown if there are matches
+                            if (!showIndustryDropdown || profileData.industry.length === 0 || !hasMatches) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {INDUSTRIES.filter(industry =>
+                                  industry.toLowerCase().includes(profileData.industry.toLowerCase())
+                                ).map((industry) => (
+                                  <button
+                                    key={industry}
+                                    type="button"
+                                    onClick={() => {
+                                      setProfileData({ ...profileData, industry });
+                                      setShowIndustryDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
+                                  >
+                                    {industry}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Sub Domain</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={profileData.subDomain}
+                            onChange={(e) => {
+                              setProfileData({ ...profileData, subDomain: e.target.value });
+                              setShowSubDomainDropdown(true);
+                            }}
+                            onFocus={() => setShowSubDomainDropdown(true)}
+                            onBlur={() => {
+                              // Delay hiding to allow click on dropdown items
+                              setTimeout(() => setShowSubDomainDropdown(false), 200);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="Type to search or enter custom sub-domain..."
+                          />
+
+                          {/* Live Search Dropdown - only show if there are matches */}
+                          {(() => {
+                            // Check if there are any matching sub-domains
+                            const hasMatches = ALL_SUB_DOMAINS.some(subDomain =>
+                              subDomain.toLowerCase().includes(profileData.subDomain.toLowerCase())
+                            );
+
+                            // Only show dropdown if there are matches
+                            if (!showSubDomainDropdown || profileData.subDomain.length === 0 || !hasMatches) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {SUB_DOMAINS.map((group) => {
+                                  const filteredSubDomains = group.subDomains.filter(subDomain =>
+                                    subDomain.toLowerCase().includes(profileData.subDomain.toLowerCase())
+                                  );
+
+                                  if (filteredSubDomains.length === 0) return null;
+
+                                  return (
+                                    <div key={group.industry}>
+                                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
+                                        {group.industry}
+                                      </div>
+                                      {filteredSubDomains.map((subDomain) => (
+                                        <button
+                                          key={subDomain}
+                                          type="button"
+                                          onClick={() => {
+                                            setProfileData({ ...profileData, subDomain });
+                                            setShowSubDomainDropdown(false);
+                                          }}
+                                          className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
+                                        >
+                                          {subDomain}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                        type="checkbox"
+                        checked={profileData.showIndustry}
+                        onChange={(e) => setProfileData({ ...profileData, showIndustry: e.target.checked })}
+                        className="sr-only peer"
+                        />
+                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                      </label>
+                      <span className="text-sm text-gray-700">Show industry information</span>
+                    </div>
+                  </div>
+
+                  {/* Skills & Expertise */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">Skills & Expertise</h3>
+                      <span className="text-sm text-gray-600">{profileData.skills.length} of 5 skills added</span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Search & Add Skills</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addSkill();
+                              }
+                            }}
+                            disabled={profileData.skills.length >= 5}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                            placeholder={profileData.skills.length >= 5 ? "Maximum 5 skills reached" : "Type skill name..."}
+                          />
+                        </div>
+                        <button
+                          onClick={addSkill}
+                          disabled={profileData.skills.length >= 5}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                            profileData.skills.length >= 5
+                              ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {profileData.skills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 text-white text-sm rounded-full"
+                          >
+                            {skill}
+                            <button
+                              onClick={() => removeSkill(skill)}
+                              className="hover:bg-red-700 rounded-full p-0.5"
+                            >
+                              <X2 className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                        {profileData.skills.includes('Product Strategy') && (
+                          <>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white text-sm rounded-full">
+                              Agile Management
+                              <button className="hover:bg-blue-700 rounded-full p-0.5">
+                                <X2 className="w-3 h-3" />
+                              </button>
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-500 text-white text-sm rounded-full">
+                              Data Analysis
+                              <button className="hover:bg-yellow-600 rounded-full p-0.5">
+                                <X2 className="w-3 h-3" />
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                          type="checkbox"
+                          checked={profileData.showSkills}
+                          onChange={(e) => setProfileData({ ...profileData, showSkills: e.target.checked })}
+                          className="sr-only peer"
+                          />
+                          <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                        <span className="text-sm text-gray-700">Show skills on profile</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Professional Summary */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">Professional Summary</h3>
+                      <span className={`text-sm ${profileData.professionalSummary.length > 500 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                        {profileData.professionalSummary.length}/500
+                      </span>
+                    </div>
+                    <textarea
+                      value={profileData.professionalSummary}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 500) {
+                          setProfileData({ ...profileData, professionalSummary: e.target.value });
+                        }
+                      }}
+                      rows={6}
+                      maxLength={500}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
+                      placeholder="Experienced Product Manager with 8+ years in tech industry. Specialized in building scalable products and leading cross-functional teams. Passionate about user experience an"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Write a brief summary of your professional background and expertise (maximum 500 characters)</p>
+                  </div>
+                </div>
+
+                {/* Continue Button - Fixed Bottom */}
+                <div className="border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg">
+                  <div className="flex justify-center sm:justify-end">
+                    <button
+                      onClick={() => handleContinue('social')}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                    >
+                      Continue
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Social & Digital Presence Section */}
+            {activeSection === 'social' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-6 rounded-t-lg">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-white/10 p-2 sm:p-3 rounded-lg">
+                      <Share className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold text-white">Social & Digital Presence</h2>
+                      <p className="text-white/90 text-xs sm:text-sm mt-0.5 sm:mt-1 hidden sm:block">{sections.find(s => s.id === 'social')?.description}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Social Media Accounts */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                      <span className="text-red-500 text-xl">#</span>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">Social Media Accounts</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* LinkedIn */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">LinkedIn Profile</label>
+                        <div className="relative">
+                          <LinkedIn className="absolute left-3 top-2.5 w-5 h-5 text-blue-700" />
+                          <input
+                            type="url"
+                            value={profileData.linkedinUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                linkedinUrl: value,
+                                showLinkedin: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://linkedin.com/in/sarah-johnson"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showLinkedin}
+                            onChange={(e) => setProfileData({ ...profileData, showLinkedin: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show LinkedIn profile</span>
+                        </div>
+                      </div>
+
+                      {/* Instagram */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Instagram</label>
+                        <div className="relative">
+                          <Instagram className="absolute left-3 top-2.5 w-5 h-5 text-pink-600" />
+                          <input
+                            type="url"
+                            value={profileData.instagramUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                instagramUrl: value,
+                                showInstagram: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://instagram.com/yourhandle"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showInstagram}
+                            onChange={(e) => setProfileData({ ...profileData, showInstagram: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show Instagram profile</span>
+                        </div>
+                      </div>
+
+                      {/* Facebook */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Facebook</label>
+                        <div className="relative">
+                          <Facebook className="absolute left-3 top-2.5 w-5 h-5 text-blue-600" />
+                          <input
+                            type="url"
+                            value={profileData.facebookUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                facebookUrl: value,
+                                showFacebook: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://facebook.com/yourprofile"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showFacebook}
+                            onChange={(e) => setProfileData({ ...profileData, showFacebook: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show Facebook profile</span>
+                        </div>
+                      </div>
+
+                      {/* Twitter/X */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">X (Twitter)</label>
+                        <div className="relative">
+                          <Twitter className="absolute left-3 top-2.5 w-5 h-5 text-gray-900" />
+                          <input
+                            type="url"
+                            value={profileData.twitterUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                twitterUrl: value,
+                                showTwitter: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://x.com/sarah_product"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showTwitter}
+                            onChange={(e) => setProfileData({ ...profileData, showTwitter: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show X profile</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Links & Portfolios */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-red-500 text-xl">🔗</span>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">Custom Links & Portfolios</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Behance */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Behance Portfolio</label>
+                        <div className="relative">
+                          <div className="absolute left-3 top-2.5 text-blue-500 font-bold text-sm">Bē</div>
+                          <input
+                            type="url"
+                            value={profileData.behanceUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                behanceUrl: value,
+                                showBehance: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://behance.net/yourportfolio"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showBehance}
+                            onChange={(e) => setProfileData({ ...profileData, showBehance: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show Behance portfolio</span>
+                        </div>
+                      </div>
+
+                      {/* Dribbble */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Dribbble</label>
+                        <div className="relative">
+                          <svg className="absolute left-3 top-2.5 w-5 h-5 text-pink-500" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308 2.3-1.555 3.936-4.02 4.395-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4 1.73 1.358 3.92 2.166 6.29 2.166 1.42 0 2.77-.29 4-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702-1.81-1.61-4.19-2.586-6.795-2.586-.825 0-1.63.1-2.4.285zm10.335 3.483c-.218.29-1.935 2.493-5.724 4.04.24.49.47.985.68 1.486.08.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.31-6.38z"/>
+                          </svg>
+                          <input
+                            type="url"
+                            value={profileData.dribbbleUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                dribbbleUrl: value,
+                                showDribbble: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://dribbble.com/yourprofile"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showDribbble}
+                            onChange={(e) => setProfileData({ ...profileData, showDribbble: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show Dribbble profile</span>
+                        </div>
+                      </div>
+
+                      {/* GitHub */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">GitHub</label>
+                        <div className="relative">
+                          <GitHub className="absolute left-3 top-2.5 w-5 h-5 text-gray-900" />
+                          <input
+                            type="url"
+                            value={profileData.githubUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                githubUrl: value,
+                                showGithub: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://github.com/sarahjohnson"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showGithub}
+                            onChange={(e) => setProfileData({ ...profileData, showGithub: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show GitHub profile</span>
+                        </div>
+                      </div>
+
+                      {/* YouTube */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">YouTube Channel</label>
+                        <div className="relative">
+                          <YouTube className="absolute left-3 top-2.5 w-5 h-5 text-red-600" />
+                          <input
+                            type="url"
+                            value={profileData.youtubeUrl}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setProfileData({
+                                ...profileData,
+                                youtubeUrl: value,
+                                showYoutube: value.trim().length > 0
+                              });
+                            }}
+                            className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                            placeholder="https://youtube.com/@yourchannel"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showYoutube}
+                            onChange={(e) => setProfileData({ ...profileData, showYoutube: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show YouTube channel</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Continue Button - Fixed Bottom */}
+                <div className="border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg">
+                  <div className="flex justify-center sm:justify-end">
+                    <button
+                      onClick={() => handleContinue('media-photo')}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                    >
+                      Continue
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Profile Photo & Background Section */}
+            {activeSection === 'media-photo' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="p-6 space-y-8">
+                  {/* Profile Photo */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-red-500 text-xl">📷</span>
+                      <h3 className="text-lg font-semibold text-gray-900">Profile Photo</h3>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <div className="flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8">
+                          <div className="text-center">
+                            <div className="relative inline-block">
+                              <div className="w-32 h-32 bg-gray-200 rounded-full overflow-hidden">
+                                {profileData.profilePhoto ? (
+                                  <img
+                                    src={profileData.profilePhoto}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <img
+                                    src={`https://ui-avatars.com/api/?name=${profileData.firstName || 'J'}+${profileData.lastName || 'D'}&size=128&background=667eea&color=fff`}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                            <input
+                              type="file"
+                              id="profile-photo-upload"
+                              accept="image/png,image/jpeg,image/jpg,image/gif"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setProfileData(prev => ({
+                                      ...prev,
+                                      profilePhoto: reader.result as string
+                                    }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById('profile-photo-upload') as HTMLInputElement;
+                                if (input) {
+                                  input.click();
+                                }
+                              }}
+                              className="mt-4 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2 mx-auto"
+                              style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                            >
+                              <Upload className="w-4 h-4" />
+                              Upload New Photo
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF up to 10MB</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-900 text-sm mb-3">Photo Guidelines</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Use a high-quality, professional headshot</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Face should be clearly visible and well-lit</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Square aspect ratio works best</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Minimum resolution: 400x400 pixels</span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                            type="checkbox"
+                            checked={profileData.showProfilePhoto}
+                            onChange={(e) => setProfileData({ ...profileData, showProfilePhoto: e.target.checked })}
+                            className="sr-only peer"
+                            />
+                            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                          </label>
+                          <span className="text-sm text-gray-700">Show profile photo publicly</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Background Image */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-red-500 text-xl">🖼️</span>
+                      <h3 className="text-lg font-semibold text-gray-900">Background Image</h3>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <div className="bg-gray-200 rounded-lg overflow-hidden relative" style={{ aspectRatio: '16/9' }}>
+                          {profileData.backgroundImage ? (
+                            <>
+                              <img src={profileData.backgroundImage} alt="Background" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 hover:opacity-100">
+                                <input
+                                  type="file"
+                                  id="background-image-upload"
+                                  accept="image/png,image/jpeg,image/jpg"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setProfileData(prev => ({
+                                          ...prev,
+                                          backgroundImage: reader.result as string
+                                        }));
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById('background-image-upload') as HTMLInputElement;
+                                    if (input) {
+                                      input.click();
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
+                                  style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  Change Background
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-center h-full p-8">
+                              <div className="text-center text-gray-600">
+                                <p className="font-medium mb-4">Current Background</p>
+                                <input
+                                  type="file"
+                                  id="background-image-upload"
+                                  accept="image/png,image/jpeg,image/jpg"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setProfileData(prev => ({
+                                          ...prev,
+                                          backgroundImage: reader.result as string
+                                        }));
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById('background-image-upload') as HTMLInputElement;
+                                    if (input) {
+                                      input.click();
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2 mx-auto"
+                                  style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  Upload Background
+                                </button>
+                                <p className="text-xs mt-2 text-gray-500">JPG or PNG up to 15MB</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-900 text-sm mb-3">Background Guidelines</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Use professional relevant imagery</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Avoid busy patterns that distract from text</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Recommended size: 1920x1080 pixels</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>Ensure good contrast with text overlay</span>
+                            </li>
+                          </ul>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Button - Fixed Bottom */}
+                <div className="border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg">
+                  <div className="flex items-center justify-center sm:justify-end">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="w-full sm:w-auto px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          Submit Profile
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Media Gallery Section */}
+            {activeSection === 'media-gallery' && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 rounded-t-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/10 p-3 rounded-lg">
+                      <Collections className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Media Gallery</h2>
+                      <p className="text-white/90 text-sm mt-1">{sections.find(s => s.id === 'media-gallery')?.description}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-8">
+                  {/* Photos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-500 text-xl">📷</span>
+                        <h3 className="text-lg font-semibold text-gray-900">Photos</h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">{profileData.photos.length} of 5 photos used</span>
+                        <button
+                          onClick={addPhoto}
+                          className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Photo
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      {profileData.photos.map((photo) => (
+                        <div key={photo.id} className="group relative">
+                          <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden">
+                            <img
+                              src={`https://ui-avatars.com/api/?name=${photo.title}&size=400&background=random`}
+                              alt={photo.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-gray-900">{photo.title}</p>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 hover:bg-gray-100 rounded">
+                                  <Edit className="w-4 h-4 text-gray-600" />
+                                </button>
+                                <button
+                                  onClick={() => removePhoto(photo.id)}
+                                  className="p-1 hover:bg-red-100 rounded"
+                                >
+                                  <Trash className="w-4 h-4 text-red-600" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={photo.showPublicly}
+                                  onChange={(e) => {
+                                    const newPhotos = profileData.photos.map(p =>
+                                      p.id === photo.id ? { ...p, showPublicly: e.target.checked } : p
+                                    );
+                                    setProfileData({ ...profileData, photos: newPhotos });
+                                  }}
+                                  className="sr-only peer"
+                                />
+                                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                              </label>
+                              <span className="text-xs text-gray-700">Show publicly</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Add Photo Placeholder */}
+                      <button
+                        onClick={addPhoto}
+                        className="aspect-video bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 flex flex-col items-center justify-center transition-colors"
+                      >
+                        <Plus className="w-8 h-8 text-gray-400" />
+                        <span className="text-sm text-gray-600 mt-2">Add Photo</span>
+                        <span className="text-xs text-gray-500">JPG, PNG up to 5MB</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Videos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-500 text-xl">🎥</span>
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Videos</h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs sm:text-sm text-gray-600">{profileData.videos.length} of 3 videos used</span>
+                        <button
+                          onClick={addVideo}
+                          className="px-3 sm:px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span className="hidden sm:inline">Add Video</span>
+                          <span className="sm:hidden">Add</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {profileData.videos.map((video) => (
+                        <div key={video.id} className="group">
+                          <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center relative">
+                            <YouTube className="w-8 h-8 text-red-600" />
+                            <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded">YouTube</div>
+                            <button className="absolute inset-0 flex items-center justify-center bg-black/50 hover:bg-black/70 transition-colors">
+                              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-gray-900 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z"/>
+                                </svg>
+                              </div>
+                            </button>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-sm font-medium text-gray-900">{video.title}</p>
+                            <p className="text-xs text-gray-600 mt-1">3:45 min</p>
+                            <input
+                              type="url"
+                              value={video.url}
+                              onChange={(e) => {
+                                const newVideos = profileData.videos.map(v =>
+                                  v.id === video.id ? { ...v, url: e.target.value } : v
+                                );
+                                setProfileData({ ...profileData, videos: newVideos });
+                              }}
+                              className="w-full px-3 py-2 mt-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                              placeholder="Video URL"
+                            />
+                            <div className="flex items-center gap-2 mt-2">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={video.showPublicly}
+                                  onChange={(e) => {
+                                    const newVideos = profileData.videos.map(v =>
+                                      v.id === video.id ? { ...v, showPublicly: e.target.checked } : v
+                                    );
+                                    setProfileData({ ...profileData, videos: newVideos });
+                                  }}
+                                  className="sr-only peer"
+                                />
+                                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                              </label>
+                              <span className="text-xs text-gray-700">Show publicly</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Add Video Placeholder */}
+                      <button
+                        onClick={addVideo}
+                        className="aspect-video bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 flex flex-col items-center justify-center transition-colors"
+                      >
+                        <Plus className="w-8 h-8 text-gray-400" />
+                        <span className="text-sm text-gray-600 mt-2">Add Video</span>
+                        <span className="text-xs text-gray-500 mt-1">YouTube or Vimeo</span>
+                        <div className="flex items-center gap-2 mt-2">
+                          <YouTube className="w-4 h-4 text-red-600" />
+                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197c1.185-1.044 2.351-2.084 3.501-3.128C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.265-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.013.01z"/>
+                          </svg>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Hidden file input for photo uploads */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+        onChange={handlePhotoUpload}
+        className="hidden"
+      />
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-8 right-8 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50 ${
+          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <X2 className="w-5 h-5" />
+          )}
+          <span className="font-medium">{toast.message}</span>
+          <button
+            onClick={() => setToast(null)}
+            className="ml-2 hover:opacity-80"
+          >
+            <X2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProfileBuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p>Loading profile builder...</p>
+        </div>
+      </div>
+    }>
+      <ProfileBuilderContent />
+    </Suspense>
+  );
+}
