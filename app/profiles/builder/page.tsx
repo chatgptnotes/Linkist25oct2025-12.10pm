@@ -904,7 +904,14 @@ function ProfileBuilderContent() {
           profiles.push(newProfile);
         }
 
-        localStorage.setItem('userProfiles', JSON.stringify(profiles));
+        // Try to save to localStorage, but don't fail if quota exceeded
+        try {
+          localStorage.setItem('userProfiles', JSON.stringify(profiles));
+        } catch (storageError) {
+          // Silently handle localStorage quota errors
+          // Profile is already saved to database, so this is not critical
+          console.warn('Could not save to localStorage (quota exceeded):', storageError);
+        }
 
         // Redirect to profile preview page
         setTimeout(() => {

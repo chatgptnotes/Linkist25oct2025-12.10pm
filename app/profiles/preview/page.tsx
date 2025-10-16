@@ -16,7 +16,9 @@ import {
   YouTube,
   Language,
   LocationOn,
-  Star
+  Star,
+  Link as LinkIcon,
+  ContentCopy
 } from '@mui/icons-material';
 
 interface ProfileData {
@@ -61,19 +63,134 @@ export default function ProfilePreviewPage() {
   const router = useRouter();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [customUrl, setCustomUrl] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Load profile data from localStorage
-    const profilesStr = localStorage.getItem('userProfiles');
-    if (profilesStr) {
-      const profiles = JSON.parse(profilesStr);
-      if (profiles && profiles.length > 0) {
-        // Get the most recent profile
-        setProfileData(profiles[profiles.length - 1]);
-      }
+    // Get custom URL from localStorage
+    const claimedUsername = localStorage.getItem('claimedUsername');
+    if (claimedUsername) {
+      const baseUrl = window.location.origin; // Gets http://localhost:3000
+      setCustomUrl(`${baseUrl}/${claimedUsername}`);
     }
-    setLoading(false);
+
+    const fetchProfileData = async () => {
+      try {
+        console.log('🔍 Fetching profile data for preview...');
+
+        // Fetch profile from database (API uses authenticated user from session)
+        const profileResponse = await fetch('/api/profiles');
+
+        if (!profileResponse.ok) {
+          console.log('⚠️ Profile fetch failed, trying localStorage fallback...');
+          // Not authenticated or no profile, try localStorage as fallback
+          const profilesStr = localStorage.getItem('userProfiles');
+          if (profilesStr) {
+            const profiles = JSON.parse(profilesStr);
+            if (profiles && profiles.length > 0) {
+              console.log('✅ Found profile in localStorage');
+              setProfileData(profiles[profiles.length - 1]);
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
+        const data = await profileResponse.json();
+        console.log('📦 Profile API response:', data);
+
+        if (data.profiles && data.profiles.length > 0) {
+          // Get the most recent profile
+          const dbProfile = data.profiles[0];
+          console.log('✅ Found profile in database:', dbProfile.id);
+
+          // Map database profile to preview format
+          const mappedProfile: ProfileData = {
+            firstName: dbProfile.first_name || '',
+            lastName: dbProfile.last_name || '',
+            primaryEmail: dbProfile.email || '',
+            secondaryEmail: dbProfile.alternate_email || '',
+            mobileNumber: dbProfile.phone_number || '',
+            whatsappNumber: dbProfile.whatsapp || '',
+            jobTitle: dbProfile.job_title || '',
+            companyName: dbProfile.company_name || '',
+            companyWebsite: dbProfile.company_website || '',
+            companyAddress: dbProfile.company_address || '',
+            companyLogo: dbProfile.company_logo_url,
+            industry: dbProfile.industry || '',
+            subDomain: dbProfile.sub_domain || '',
+            skills: dbProfile.skills || [],
+            professionalSummary: dbProfile.professional_summary || '',
+            linkedinUrl: dbProfile.social_links?.linkedin || '',
+            instagramUrl: dbProfile.social_links?.instagram || '',
+            facebookUrl: dbProfile.social_links?.facebook || '',
+            twitterUrl: dbProfile.social_links?.twitter || '',
+            behanceUrl: dbProfile.social_links?.behance || '',
+            dribbbleUrl: dbProfile.social_links?.dribbble || '',
+            githubUrl: dbProfile.social_links?.github || '',
+            youtubeUrl: dbProfile.social_links?.youtube || '',
+            showLinkedin: !!dbProfile.social_links?.linkedin,
+            showInstagram: !!dbProfile.social_links?.instagram,
+            showFacebook: !!dbProfile.social_links?.facebook,
+            showTwitter: !!dbProfile.social_links?.twitter,
+            showBehance: !!dbProfile.social_links?.behance,
+            showDribbble: !!dbProfile.social_links?.dribbble,
+            showGithub: !!dbProfile.social_links?.github,
+            showYoutube: !!dbProfile.social_links?.youtube,
+            profilePhoto: dbProfile.profile_photo_url,
+            backgroundImage: dbProfile.background_image_url,
+            showProfilePhoto: !!dbProfile.profile_photo_url,
+            showBackgroundImage: !!dbProfile.background_image_url,
+          };
+
+          console.log('✅ Mapped profile data for preview');
+          setProfileData(mappedProfile);
+        } else {
+          console.log('⚠️ No profiles found in database, trying localStorage...');
+          // No profiles in database, try localStorage
+          const profilesStr = localStorage.getItem('userProfiles');
+          if (profilesStr) {
+            const profiles = JSON.parse(profilesStr);
+            if (profiles && profiles.length > 0) {
+              console.log('✅ Found profile in localStorage');
+              setProfileData(profiles[profiles.length - 1]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching profile:', error);
+        // Fallback to localStorage
+        try {
+          const profilesStr = localStorage.getItem('userProfiles');
+          if (profilesStr) {
+            const profiles = JSON.parse(profilesStr);
+            if (profiles && profiles.length > 0) {
+              console.log('✅ Found profile in localStorage (fallback)');
+              setProfileData(profiles[profiles.length - 1]);
+            }
+          }
+        } catch (storageError) {
+          console.warn('Could not read localStorage:', storageError);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileData();
   }, []);
+
+  const handleCopyUrl = async () => {
+    if (!customUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(customUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -184,6 +301,37 @@ export default function ProfilePreviewPage() {
                     <p>{profileData.subDomain}</p>
                   )}
                 </div>
+
+                {/* Custom URL Section */}
+                {customUrl && (
+                  <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <LinkIcon className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-semibold text-gray-700">Your Profile URL</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={customUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium break-all flex-1"
+                      >
+                        {customUrl}
+                      </a>
+                      <button
+                        onClick={handleCopyUrl}
+                        className="flex-shrink-0 p-1.5 bg-white border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition"
+                        title="Copy URL"
+                      >
+                        {copied ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <ContentCopy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Company Logo - Right side */}

@@ -10,14 +10,17 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authenticated user
+    // Get authenticated user (optional for GET requests)
     const authSession = await getCurrentUser(request)
 
+    // If not authenticated, return empty profiles array (client will use localStorage fallback)
     if (!authSession.isAuthenticated || !authSession.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      console.log('⚠️ No authentication found, returning empty profiles (client will use localStorage)')
+      return NextResponse.json({
+        success: true,
+        profiles: [],
+        unauthenticated: true
+      })
     }
 
     const userId = authSession.user.id

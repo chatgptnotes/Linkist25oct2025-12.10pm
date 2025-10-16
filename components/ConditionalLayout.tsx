@@ -56,21 +56,15 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me');
-        console.log('🔐 Auth response status:', response.status);
         if (response.ok) {
           const data = await response.json();
-          console.log('👤 User data from auth:', data);
           setUserData(data.user);
         } else if (response.status === 401) {
-          // User not authenticated - this is expected, don't log error
-          console.log('❌ Not authenticated (401)');
+          // User not authenticated - this is expected
           setUserData(null);
         }
       } catch (error) {
-        // Only log network errors, not expected 401s
-        if (error instanceof Error && error.message !== 'Failed to fetch') {
-          console.error('Auth check error:', error);
-        }
+        // Silently handle errors - 401 is expected when not logged in
         setUserData(null);
       }
     };

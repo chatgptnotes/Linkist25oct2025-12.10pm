@@ -173,8 +173,14 @@ export default function ClaimURLPage() {
       });
 
       if (response.ok) {
-        // Store the claimed username in localStorage
+        const data = await response.json();
+        // Store the claimed username and full URL in localStorage
         localStorage.setItem('claimedUsername', username);
+        localStorage.setItem('profileUrl', data.profileUrl);
+
+        // Show success message with full URL
+        alert(`Success! Your profile is now available at:\n${data.profileUrl}`);
+
         // Redirect to profile builder
         router.push('/profiles/builder');
       } else {

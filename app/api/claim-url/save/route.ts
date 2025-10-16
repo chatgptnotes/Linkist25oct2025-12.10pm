@@ -39,6 +39,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Get base URL from environment (will be localhost for dev, linkist.com for production)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+    const fullProfileUrl = `${baseUrl}/${username}`;
+
     // Check if username is still available (only if custom_url column exists)
     try {
       const { data: existingProfile, error: checkError } = await supabase
@@ -77,88 +81,49 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (userProfile) {
-      // Update existing profile (only update fields that exist)
+      // Update existing profile
       const updateData: any = {
-        user_id: userId,  // Add user_id to update
+        user_id: userId,
         first_name: firstName || userProfile.first_name,
         last_name: lastName || userProfile.last_name,
+        custom_url: username,
+        profile_url: fullProfileUrl,
         updated_at: new Date().toISOString()
       };
 
-      // Try to add custom_url if column exists
-      try {
-        updateData.custom_url = username;
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update(updateData)
-          .eq('id', userProfile.id);
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userProfile.id);
 
-        if (updateError) {
-          console.error('Error updating profile:', updateError);
-
-          // If custom_url column doesn't exist, try without it
-          if (updateError.message?.includes('custom_url')) {
-            delete updateData.custom_url;
-            const { error: retryError } = await supabase
-              .from('profiles')
-              .update(updateData)
-              .eq('id', userProfile.id);
-
-            if (retryError) {
-              throw retryError;
-            }
-          } else {
-            throw updateError;
-          }
-        }
-      } catch (error) {
-        console.error('Update error:', error);
+      if (updateError) {
+        console.error('Error updating profile:', updateError);
         return NextResponse.json(
-          { error: 'Failed to save username' },
+          { error: 'Failed to save username', details: updateError.message },
           { status: 500 }
         );
       }
     } else {
       // Create new profile
-      const profileId = `profile_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
       const insertData: any = {
-        user_id: userId,  // Add user_id reference
-        email: userEmail,  // Changed from user_email to email
+        user_id: userId,
+        email: userEmail,
         first_name: firstName || null,
         last_name: lastName || null,
+        custom_url: username,
+        profile_url: fullProfileUrl,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // Try to add custom_url if column exists
-      try {
-        insertData.custom_url = username;
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert(insertData);
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert(insertData);
 
-        if (insertError) {
-          console.error('Error creating profile:', insertError);
-
-          // If custom_url column doesn't exist, try without it
-          if (insertError.message?.includes('custom_url')) {
-            delete insertData.custom_url;
-            const { error: retryError } = await supabase
-              .from('profiles')
-              .insert(insertData);
-
-            if (retryError) {
-              throw retryError;
-            }
-          } else {
-            throw insertError;
-          }
-        }
-      } catch (error) {
-        console.error('Insert error:', error);
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
         return NextResponse.json(
-          { error: 'Failed to save username' },
+          { error: 'Failed to save username', details: insertError.message },
           { status: 500 }
         );
       }
@@ -167,6 +132,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       username,
+      profileUrl: fullProfileUrl,  // Return full URL to frontend
       message: 'Username saved successfully'
     });
 
