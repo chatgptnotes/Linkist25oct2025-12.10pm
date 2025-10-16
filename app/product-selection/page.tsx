@@ -77,7 +77,7 @@ export default function ProductSelectionPage() {
           }
 
           // Determine price label
-          let priceLabel = 'Basic';
+          let priceLabel = 'Free';
           if (plan.popular) {
             priceLabel = 'Most Popular';
           } else if (plan.type === 'digital-with-app') {
@@ -190,9 +190,82 @@ export default function ProductSelectionPage() {
     // Store the selection
     localStorage.setItem('productSelection', selectedProduct);
 
-    // All cards redirect to NFC configuration
+    // Route based on product type
     setTimeout(() => {
-      router.push('/nfc/configure');
+      if (selectedProduct === 'digital-only') {
+        // Digital Profile Only → Success page (no payment needed)
+        router.push('/nfc/success');
+      } else if (selectedProduct === 'digital-with-app') {
+        // Digital Profile + Linkist App → Payment page directly
+        const userProfile = localStorage.getItem('userProfile');
+        let email = '';
+        let firstName = 'User';
+        let lastName = 'Name';
+        let phoneNumber = '';
+        let country = 'US';
+
+        if (userProfile) {
+          try {
+            const profile = JSON.parse(userProfile);
+            email = profile.email || '';
+            firstName = profile.firstName || 'User';
+            lastName = profile.lastName || 'Name';
+            phoneNumber = profile.mobile || '';
+            country = profile.country || 'US';
+          } catch (error) {
+            console.error('Error parsing user profile:', error);
+          }
+        }
+
+        // Create minimal order for digital product (no physical shipping needed)
+        const digitalProfilePrice = 59;
+        const subscriptionPrice = 120;
+        const taxableAmount = digitalProfilePrice; // Only tax on digital profile
+        const taxAmount = country === 'IN' ? taxableAmount * 0.18 : taxableAmount * 0.05;
+        const totalAmount = digitalProfilePrice + subscriptionPrice + taxAmount;
+
+        const digitalOrder = {
+          orderId: `digital-${Date.now()}`, // Temporary ID
+          orderNumber: `DIG-${Date.now()}`,
+          customerName: `${firstName} ${lastName}`,
+          email,
+          phoneNumber,
+          productName: 'Digital Profile + Linkist App',
+          cardConfig: {
+            firstName,
+            lastName,
+            baseMaterial: 'digital',
+            color: 'none',
+            quantity: 1,
+            isDigitalOnly: true,
+            fullName: `${firstName} ${lastName}`
+          },
+          shipping: {
+            country,
+            addressLine1: 'N/A - Digital Product',
+            city: 'N/A',
+            postalCode: 'N/A'
+          },
+          pricing: {
+            digitalProfilePrice: digitalProfilePrice,
+            subscriptionPrice: subscriptionPrice,
+            subtotal: digitalProfilePrice + subscriptionPrice,
+            taxAmount: taxAmount,
+            shippingCost: 0,
+            total: totalAmount
+          },
+          isDigitalProduct: true
+        };
+
+        localStorage.setItem('pendingOrder', JSON.stringify(digitalOrder));
+        router.push('/nfc/payment');
+      } else if (selectedProduct === 'physical-digital') {
+        // Physical Card + Digital Profile → Configure page
+        router.push('/nfc/configure');
+      } else {
+        // Default fallback
+        router.push('/nfc/configure');
+      }
     }, 500);
   };
 

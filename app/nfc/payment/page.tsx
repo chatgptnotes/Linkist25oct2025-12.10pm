@@ -823,84 +823,101 @@ export default function NFCPaymentPage() {
             <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Order Summary</h3>
 
-              {/* Card Preview */}
-              <div className="mb-4 sm:mb-6">
-                <h4 className="text-sm sm:text-base font-medium mb-2 sm:mb-3">Your NFC Card</h4>
-                <p className="text-xs sm:text-sm text-gray-600 mb-1.5 sm:mb-2">
-                  {orderData?.cardConfig?.fullName || `${orderData?.cardConfig?.firstName} ${orderData?.cardConfig?.lastName}` || 'Custom NFC Card'}
-                </p>
-                {orderData?.cardConfig?.baseMaterial && (
-                  <p className="text-xs text-gray-500 mb-3 sm:mb-4">
-                    Material: {orderData.cardConfig.baseMaterial.charAt(0).toUpperCase() + orderData.cardConfig.baseMaterial.slice(1)} •
-                    Color: {(() => {
-                      const color = orderData.cardConfig.color || 'Black';
-                      // Remove material suffix (e.g., "black-pvc" -> "black")
-                      const colorName = color.split('-')[0];
-                      return colorName.charAt(0).toUpperCase() + colorName.slice(1);
-                    })()}
+              {/* Card Preview - Hide for digital products */}
+              {orderData?.cardConfig?.baseMaterial !== 'digital' && (
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-sm sm:text-base font-medium mb-2 sm:mb-3">Your NFC Card</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 mb-1.5 sm:mb-2">
+                    {orderData?.cardConfig?.fullName || `${orderData?.cardConfig?.firstName} ${orderData?.cardConfig?.lastName}` || 'Custom NFC Card'}
                   </p>
-                )}
-
-                {/* Front Card */}
-                <div className="mb-3 sm:mb-4">
-                  <div className={`w-48 sm:w-56 aspect-[1.6/1] bg-gradient-to-br ${getCardGradient()} rounded-lg sm:rounded-xl relative overflow-hidden shadow-lg mr-auto`}>
-                    {/* AI Icon top right - Changes based on card color */}
-                    <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                      <div
-                        className={`rounded-md sm:rounded-lg p-1.5 sm:p-2 shadow-md ${
-                          orderData?.cardConfig?.color === 'white'
-                            ? 'bg-white'
-                            : 'bg-gray-900'
-                        }`}
-                      >
-                        <img
-                          src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
-                          alt="AI"
-                          className={`w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* User Name or Initials */}
-                    <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4">
-                      {(() => {
-                        const firstName = orderData?.cardConfig?.firstName?.trim() || '';
-                        const lastName = orderData?.cardConfig?.lastName?.trim() || '';
-                        const isSingleCharOnly = firstName.length <= 1 && lastName.length <= 1;
-
-                        if (isSingleCharOnly) {
-                          return (
-                            <div className={`${getTextColor()} text-lg sm:text-xl font-light`}>
-                              {(firstName || 'J').toUpperCase()}{(lastName || 'D').toUpperCase()}
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className={`${getTextColor()} text-xs sm:text-sm font-medium`}>
-                              {firstName} {lastName}
-                            </div>
-                          );
-                        }
+                  {orderData?.cardConfig?.baseMaterial && (
+                    <p className="text-xs text-gray-500 mb-3 sm:mb-4">
+                      Material: {orderData.cardConfig.baseMaterial.charAt(0).toUpperCase() + orderData.cardConfig.baseMaterial.slice(1)} •
+                      Color: {(() => {
+                        const color = orderData.cardConfig.color || 'Black';
+                        // Remove material suffix (e.g., "black-pvc" -> "black")
+                        const colorName = color.split('-')[0];
+                        return colorName.charAt(0).toUpperCase() + colorName.slice(1);
                       })()}
+                    </p>
+                  )}
+
+                  {/* Front Card */}
+                  <div className="mb-3 sm:mb-4">
+                    <div className={`w-48 sm:w-56 aspect-[1.6/1] bg-gradient-to-br ${getCardGradient()} rounded-lg sm:rounded-xl relative overflow-hidden shadow-lg mr-auto`}>
+                      {/* AI Icon top right - Changes based on card color */}
+                      <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
+                        <div
+                          className={`rounded-md sm:rounded-lg p-1.5 sm:p-2 shadow-md ${
+                            orderData?.cardConfig?.color === 'white'
+                              ? 'bg-white'
+                              : 'bg-gray-900'
+                          }`}
+                        >
+                          <img
+                            src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
+                            alt="AI"
+                            className={`w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* User Name or Initials */}
+                      <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4">
+                        {(() => {
+                          const firstName = orderData?.cardConfig?.firstName?.trim() || '';
+                          const lastName = orderData?.cardConfig?.lastName?.trim() || '';
+                          const isSingleCharOnly = firstName.length <= 1 && lastName.length <= 1;
+
+                          if (isSingleCharOnly) {
+                            return (
+                              <div className={`${getTextColor()} text-lg sm:text-xl font-light`}>
+                                {(firstName || 'J').toUpperCase()}{(lastName || 'D').toUpperCase()}
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className={`${getTextColor()} text-xs sm:text-sm font-medium`}>
+                                {firstName} {lastName}
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Pricing Breakdown */}
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                <div className="flex justify-between">
-                  <span>NFC Card × {orderData?.cardConfig?.quantity || 1}</span>
-                  <span>${orderData.pricing.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Customization</span>
-                  <span className="text-green-600">Included</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span className="text-green-600">Included</span>
-                </div>
+                {orderData?.cardConfig?.baseMaterial === 'digital' ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Digital Profile + Linkist App</span>
+                      <span>${orderData.pricing.digitalProfilePrice?.toFixed(2) || '59.00'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>1 Year Linkist App Subscription</span>
+                      <span>${orderData.pricing.subscriptionPrice?.toFixed(2) || '120.00'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span>NFC Card × {orderData?.cardConfig?.quantity || 1}</span>
+                      <span>${orderData.pricing.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Customization</span>
+                      <span className="text-green-600">Included</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Shipping</span>
+                      <span className="text-green-600">Included</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span>{isIndia ? 'GST (18%)' : 'VAT (5%)'}</span>
                   <span>${orderData.pricing.taxAmount.toFixed(2)}</span>
