@@ -8,8 +8,8 @@ export default function ConfiguratorDemoPage() {
 
   // Mock admin-configured prices
   const adminPrices = {
-    pvc: 29,
-    wood: 49,
+    pvc: 69,
+    wood: 79,
     metal: 99
   };
 

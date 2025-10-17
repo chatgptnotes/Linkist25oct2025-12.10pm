@@ -18,6 +18,8 @@ export interface SubscriptionPlan {
   name: string;
   type: 'physical-digital' | 'digital-with-app' | 'digital-only';
   price: number;
+  gst_percentage: number;
+  vat_percentage: number;
   description: string;
   features: string[];
   status: 'active' | 'inactive' | 'draft';
@@ -31,6 +33,8 @@ export interface CreatePlanData {
   name: string;
   type: 'physical-digital' | 'digital-with-app' | 'digital-only';
   price: number;
+  gst_percentage?: number;
+  vat_percentage?: number;
   description: string;
   features: string[];
   status?: 'active' | 'inactive' | 'draft';
@@ -110,6 +114,8 @@ export const SupabasePlansStore = {
       name: planData.name,
       type: planData.type,
       price: planData.price,
+      gst_percentage: planData.gst_percentage || 18,
+      vat_percentage: planData.vat_percentage || 5,
       description: planData.description,
       features: planData.features,
       status: planData.status || 'draft',

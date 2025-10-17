@@ -9,6 +9,7 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
 import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar';
 
 // Icon aliases
 const Person = PersonIcon;
@@ -34,6 +35,8 @@ interface StepData {
 
 interface PriceSummary {
   currency: string;
+  productPlanPrice: number;
+  materialPrice: number;
   basePrice: number;
   customization: number;
   taxLabel: string;
@@ -55,6 +58,9 @@ export default function ConfigureNewPage() {
   });
   const [userCountry, setUserCountry] = useState<string>('India');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Product Plan Price (Physical Card + Digital Profile)
+  const PRODUCT_PLAN_PRICE = 69;
 
   // Clear any existing corrupted data on component mount
   useEffect(() => {
@@ -90,8 +96,8 @@ export default function ConfigureNewPage() {
 
   // Admin-configured prices (these would come from admin panel)
   const prices: Record<BaseMaterial, number> = {
-    pvc: 29,
-    wood: 49,
+    pvc: 69,
+    wood: 79,
     metal: 99
   };
 
@@ -197,8 +203,12 @@ export default function ConfigureNewPage() {
 
   // Calculate price summary with region-based tax logic
   const calculatePriceSummary = (): PriceSummary | null => {
-    const basePrice = getPrice();
-    if (!basePrice) return null;
+    const materialPrice = getPrice();
+    if (!materialPrice) return null;
+
+    // Only Material Price (no product plan price)
+    const productPlanPrice = PRODUCT_PLAN_PRICE;
+    const basePrice = materialPrice; // Only material price
 
     // Region-based tax rates
     let taxRate = 0.10; // Default 10%
@@ -219,6 +229,8 @@ export default function ConfigureNewPage() {
 
     return {
       currency: '$',
+      productPlanPrice,
+      materialPrice,
       basePrice,
       customization: 0,
       taxLabel,
@@ -291,23 +303,9 @@ export default function ConfigureNewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      {/* Simplified Header - Linkist Logo Only */}
-      {/* <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-center">
-            <a href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-              <img
-                src="/logo_linkist.png"
-                alt="Linkist Logo"
-                className="h-10 w-auto"
-              />
-              <span className="text-2xl font-bold text-gray-900">Linkist</span>
-            </a>
-          </div>
-        </div>
-      </div> */}
+      <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:items-start">
           {/* Configuration Section - Left Side */}
           <div className="lg:col-span-7 space-y-4 order-2 lg:order-1">
@@ -531,9 +529,11 @@ export default function ConfigureNewPage() {
 
                   return (
                     <div className="space-y-1.5 text-sm">
-                      {/* Base Price */}
+                      {/* Material Price Only */}
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-700">Base Price</span>
+                        <span className="text-gray-700">
+                          {formData.baseMaterial ? `${formData.baseMaterial.toUpperCase()} Card Material` : 'Card Material'}
+                        </span>
                         <span className="font-semibold text-gray-900">
                           {hasBase ? formatCurrency(getPrice()) : '—'}
                         </span>

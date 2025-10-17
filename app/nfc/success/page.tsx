@@ -70,6 +70,9 @@ export default function SuccessPage() {
     );
   }
 
+  // Check if this is a digital-only product (no physical card)
+  const isDigitalOnly = orderData.isDigitalOnly || orderData.isDigitalProduct || orderData.cardConfig?.baseMaterial === 'digital';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-16">
@@ -82,17 +85,21 @@ export default function SuccessPage() {
             Congratulations!
           </h1>
           <p className="text-xl text-gray-700 mb-4">
-            Your card is on the way
+            {isDigitalOnly ? 'Your digital profile is ready!' : 'Your card is on the way'}
           </p>
           <p className="text-lg text-gray-600 mb-2">
-            Thank you for your order. Your NFC card is being prepared.
+            {isDigitalOnly
+              ? 'Thank you for your order. Your digital profile has been activated.'
+              : 'Thank you for your order. Your NFC card is being prepared.'}
           </p>
           <p className="text-lg font-medium text-gray-700">
             Order #{orderData.orderNumber}
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        {/* Only show Order Details and Shipping for physical products */}
+        {!isDigitalOnly && (
+          <div className="grid md:grid-cols-2 gap-8">
           {/* Order Details */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-6">Order Details</h3>
@@ -201,7 +208,8 @@ export default function SuccessPage() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* What Happens Next */}
         <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
@@ -215,50 +223,60 @@ export default function SuccessPage() {
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-900 mb-1">Order Confirmed</h3>
-                <p className="text-gray-600 text-sm">Your order has been received and confirmed</p>
+                <h3 className="font-bold text-lg text-gray-900 mb-1">
+                  {isDigitalOnly ? 'Profile Activated' : 'Order Confirmed'}
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  {isDigitalOnly
+                    ? 'Your digital profile has been activated and is ready to use'
+                    : 'Your order has been received and confirmed'}
+                </p>
                 <p className="text-xs text-gray-500 mt-2">Just now</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
-                  <Package className="h-6 w-6 text-white" />
+            {!isDigitalOnly && (
+              <>
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-gray-900 mb-1">Design Processing</h3>
+                    <p className="text-gray-600 text-sm">Your card design is being prepared for production</p>
+                    <p className="text-xs text-gray-500 mt-2">Within 1-2 business days</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-900 mb-1">Design Processing</h3>
-                <p className="text-gray-600 text-sm">Your card design is being prepared for production</p>
-                <p className="text-xs text-gray-500 mt-2">Within 1-2 business days</p>
-              </div>
-            </div>
 
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                  <Truck className="h-6 w-6 text-white" />
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                      <Truck className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-gray-500 mb-1">Shipping</h3>
+                    <p className="text-gray-500 text-sm">Your card will be shipped to your address</p>
+                    <p className="text-xs text-gray-400 mt-2">3-5 business days after production</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-500 mb-1">Shipping</h3>
-                <p className="text-gray-500 text-sm">Your card will be shipped to your address</p>
-                <p className="text-xs text-gray-400 mt-2">3-5 business days after production</p>
-              </div>
-            </div>
 
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-white" />
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                      <Mail className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-gray-500 mb-1">Delivery</h3>
+                    <p className="text-gray-500 text-sm">Your NFC card arrives at your doorstep</p>
+                    <p className="text-xs text-gray-400 mt-2">We'll send tracking information</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-500 mb-1">Delivery</h3>
-                <p className="text-gray-500 text-sm">Your NFC card arrives at your doorstep</p>
-                <p className="text-xs text-gray-400 mt-2">We'll send tracking information</p>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -275,9 +293,16 @@ export default function SuccessPage() {
               </p>
               <ul className="text-sm text-blue-600 space-y-1">
                 <li>• Order confirmation (sent now)</li>
-                <li>• Design approval and production start</li>
-                <li>• Shipping notification with tracking</li>
-                <li>• Delivery confirmation</li>
+                {!isDigitalOnly && (
+                  <>
+                    <li>• Design approval and production start</li>
+                    <li>• Shipping notification with tracking</li>
+                    <li>• Delivery confirmation</li>
+                  </>
+                )}
+                {isDigitalOnly && (
+                  <li>• Profile setup instructions</li>
+                )}
               </ul>
             </div>
           </div>

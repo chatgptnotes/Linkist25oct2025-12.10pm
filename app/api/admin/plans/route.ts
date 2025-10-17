@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const { name, type, price, gst_percentage, vat_percentage, description, features, status, popular, allowed_countries } = body;
 
     // Validation
-    if (!name || !type || !price || !description || !features) {
+    if (!name || !type || price === undefined || price === null || !description || !features) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (typeof price !== 'number' || price <= 0) {
+    if (typeof price !== 'number' || price < 0) {
       return NextResponse.json(
         { error: 'Invalid price' },
         { status: 400 }
@@ -134,7 +134,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Validate price if provided
-    if (updateData.price !== undefined && (typeof updateData.price !== 'number' || updateData.price <= 0)) {
+    if (updateData.price !== undefined && (typeof updateData.price !== 'number' || updateData.price < 0)) {
       return NextResponse.json(
         { error: 'Invalid price' },
         { status: 400 }

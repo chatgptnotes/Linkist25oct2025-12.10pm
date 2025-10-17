@@ -31,7 +31,7 @@ interface NFCCardConfiguratorProps {
 }
 
 export default function NFCCardConfigurator({
-  prices = { pvc: 29, wood: 49, metal: 99 },
+  prices = { pvc: 69, wood: 79, metal: 99 },
   patterns = [
     { id: 1, name: 'Pattern 1' },
     { id: 2, name: 'Pattern 2' },

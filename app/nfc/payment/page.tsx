@@ -14,6 +14,7 @@ import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar';
 
 // Icon aliases
 const CreditCard = CreditCardIcon;
@@ -57,7 +58,7 @@ export default function NFCPaymentPage() {
   const router = useRouter();
 
   // Payment state
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'voucher'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi'>('card');
   const [processing, setProcessing] = useState(false);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [hasOrderError, setHasOrderError] = useState(false);
@@ -77,6 +78,7 @@ export default function NFCPaymentPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
 
   useEffect(() => {
     // Get order data from localStorage (set by checkout page)
@@ -91,8 +93,15 @@ export default function NFCPaymentPage() {
         setOrderData(data); // Set data so page can display error properly
       } else {
         setOrderData(data);
-        setCardHolder(data.customerName || '');
+        setCardHolder(''); // Keep cardholder name blank
         setHasOrderError(false);
+
+        // Load voucher from order data if present
+        if (data.pricing?.voucherCode) {
+          setVoucherCode(data.pricing.voucherCode);
+          setVoucherDiscount(data.pricing.voucherDiscount || 0);
+          setVoucherValid(true);
+        }
       }
     } else {
       // If no order data, redirect back to checkout
@@ -177,8 +186,12 @@ export default function NFCPaymentPage() {
   };
 
   const validateVoucher = async () => {
-    if (!voucherCode.trim()) return;
+    if (!voucherCode.trim()) {
+      alert('Please enter a voucher code');
+      return;
+    }
 
+    setApplyingVoucher(true);
     try {
       const response = await fetch('/api/vouchers/validate', {
         method: 'POST',
@@ -203,11 +216,15 @@ export default function NFCPaymentPage() {
       } else {
         setVoucherDiscount(0);
         setVoucherValid(false);
+        alert('Invalid voucher code');
       }
     } catch (error) {
       console.error('Error validating voucher:', error);
       setVoucherDiscount(0);
       setVoucherValid(false);
+      alert('Error validating voucher. Please try again.');
+    } finally {
+      setApplyingVoucher(false);
     }
   };
 
@@ -282,19 +299,6 @@ export default function NFCPaymentPage() {
     });
   };
 
-  const handleVoucherPayment = async () => {
-    if (voucherDiscount === 100) {
-      // Full discount, no payment needed
-      console.log('🎟️ 100% voucher discount - no payment needed');
-      return { success: true, paymentId: 'voucher_' + voucherCode };
-    } else {
-      // Partial discount - still process the order with reduced amount
-      console.log('🎟️ Partial voucher discount applied:', voucherDiscount + '%');
-      console.log('🎟️ Final amount after discount:', getFinalAmount());
-      return { success: true, paymentId: 'voucher_partial_' + voucherCode + '_' + Date.now() };
-    }
-  };
-
   const handlePayment = async () => {
     if (!orderData) {
       console.error('❌ No order data found');
@@ -337,16 +341,6 @@ export default function NFCPaymentPage() {
           }
           console.log('💳 Processing UPI payment...');
           paymentResult = await handleUPIPayment();
-          break;
-
-        case 'voucher':
-          if (!voucherCode || !voucherValid) {
-            alert('Please enter a valid voucher code');
-            setProcessing(false);
-            return;
-          }
-          console.log('💳 Processing voucher payment...');
-          paymentResult = await handleVoucherPayment();
           break;
 
         default:
@@ -479,7 +473,9 @@ export default function NFCPaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <Navbar />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pt-24">
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Payment Form - Left Side */}
           <div className="lg:col-span-2 order-2 lg:order-1">
@@ -514,18 +510,6 @@ export default function NFCPaymentPage() {
                     UPI
                   </button>
                 )}
-
-                <button
-                  onClick={() => setPaymentMethod('voucher')}
-                  className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg font-medium transition-all text-sm sm:text-base"
-                  style={{
-                    backgroundColor: paymentMethod === 'voucher' ? '#ff0000' : '#F3F4F6',
-                    color: paymentMethod === 'voucher' ? '#FFFFFF' : '#374151'
-                  }}
-                >
-                  <Ticket className="w-4 h-4 sm:w-5 sm:h-5 inline mr-2" />
-                  Voucher
-                </button>
               </div>
 
               {/* Express Checkout (for card payment) */}
@@ -591,7 +575,7 @@ export default function NFCPaymentPage() {
                       type="text"
                       value={cardHolder}
                       onChange={(e) => setCardHolder(e.target.value)}
-                      placeholder="ddd dddd"
+                      placeholder="John Doe"
                       className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent text-sm sm:text-base"
                     />
                   </div>
@@ -715,73 +699,6 @@ export default function NFCPaymentPage() {
                 </div>
               )}
 
-              {/* Voucher Payment Form */}
-              {paymentMethod === 'voucher' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Enter Voucher Code
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={voucherCode}
-                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                        placeholder="ENTER CODE"
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
-                      />
-                      <button
-                        onClick={validateVoucher}
-                        className="px-6 py-3 rounded-lg transition-colors"
-                        style={{ backgroundColor: '#111827', color: '#FFFFFF' }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-
-                  {voucherValid === true && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-green-900">Voucher Applied!</p>
-                        <p className="text-sm text-green-700">
-                          You get {voucherDiscount}% off on your order
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {voucherValid === false && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-red-900">Invalid Voucher</p>
-                        <p className="text-sm text-red-700">
-                          This voucher code is not valid or has expired
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Have a voucher code?</h4>
-                    <p className="text-sm text-gray-600">
-                      Enter your code above and click Apply to get your discount
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Voucher Info Message */}
-              {paymentMethod === 'voucher' && voucherValid && voucherDiscount < 100 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    💡 Your voucher covers {voucherDiscount}% of the order. The remaining ${getFinalAmount().toFixed(2)} will be processed as a voucher order with partial discount.
-                  </p>
-                </div>
-              )}
-
               {/* Payment Button */}
               <button
                 onClick={handlePayment}
@@ -797,8 +714,6 @@ export default function NFCPaymentPage() {
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                     Processing...
                   </div>
-                ) : paymentMethod === 'voucher' && voucherDiscount === 100 ? (
-                  'Complete Order (Free with Voucher)'
                 ) : (
                   `Pay $${getFinalAmount().toFixed(2)}`
                 )}
@@ -904,10 +819,22 @@ export default function NFCPaymentPage() {
                   </>
                 ) : (
                   <>
+                    {/* Material Price Only */}
                     <div className="flex justify-between">
-                      <span>NFC Card × {orderData?.cardConfig?.quantity || 1}</span>
-                      <span>${orderData.pricing.subtotal.toFixed(2)}</span>
+                      <span>
+                        {orderData?.cardConfig?.baseMaterial
+                          ? `${orderData.cardConfig.baseMaterial.toUpperCase()} Card Material × ${orderData?.cardConfig?.quantity || 1}`
+                          : `Card Material × ${orderData?.cardConfig?.quantity || 1}`}
+                      </span>
+                      <span>${orderData.pricing.materialPrice ? (orderData.pricing.materialPrice * (orderData?.cardConfig?.quantity || 1)).toFixed(2) : '99.00'}</span>
                     </div>
+
+                    {/* App Subscription */}
+                    <div className="flex justify-between">
+                      <span>1 Year Linkist App Subscription × {orderData?.cardConfig?.quantity || 1}</span>
+                      <span>${orderData.pricing.appSubscriptionPrice ? (orderData.pricing.appSubscriptionPrice * (orderData?.cardConfig?.quantity || 1)).toFixed(2) : '120.00'}</span>
+                    </div>
+
                     <div className="flex justify-between">
                       <span>Customization</span>
                       <span className="text-green-600">Included</span>
@@ -922,18 +849,60 @@ export default function NFCPaymentPage() {
                   <span>{isIndia ? 'GST (18%)' : 'VAT (5%)'}</span>
                   <span>${orderData.pricing.taxAmount.toFixed(2)}</span>
                 </div>
-                {orderData.isFounderMember && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Founder Member Benefits (10% off)</span>
-                    <span>-${(orderData.pricing.subtotal * 0.10).toFixed(2)}</span>
+
+                {/* Voucher Section */}
+                <div className="border-t pt-2 sm:pt-3 mt-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                    Have a Voucher Code?
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                      placeholder="ENTER CODE"
+                      className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={validateVoucher}
+                      disabled={applyingVoucher || !voucherCode.trim()}
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
+                    >
+                      {applyingVoucher ? 'Applying...' : 'Apply'}
+                    </button>
                   </div>
-                )}
-                {voucherDiscount > 0 && (
+
+                  {voucherValid === true && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                      <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 mt-0.5" />
+                      <div className="text-xs text-green-700">
+                        <p className="font-medium">Voucher Applied!</p>
+                        <p>You get {voucherDiscount}% off on your order</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {voucherValid === false && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                      <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-600 mt-0.5" />
+                      <div className="text-xs text-red-700">
+                        <p className="font-medium">Invalid Voucher</p>
+                        <p>This voucher code is not valid or has expired</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Discount Line */}
+                {voucherDiscount > 0 && voucherValid && (
                   <div className="flex justify-between text-green-600 font-medium">
-                    <span>Voucher ({voucherDiscount}% off)</span>
+                    <span>Voucher Discount ({voucherDiscount}% off)</span>
                     <span>-${((orderData.pricing.total * voucherDiscount) / 100).toFixed(2)}</span>
                   </div>
                 )}
+
                 <div className="border-t pt-2 sm:pt-3 flex justify-between font-semibold text-sm sm:text-base">
                   <span>Total</span>
                   <span>${getFinalAmount().toFixed(2)}</span>

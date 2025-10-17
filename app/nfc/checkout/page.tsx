@@ -8,6 +8,7 @@ import * as z from 'zod';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar';
 // PIN verification removed - no longer needed
 
 // Dynamically import MapPicker to avoid SSR issues
@@ -16,6 +17,8 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import SecurityIcon from '@mui/icons-material/Security';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import CheckIcon from '@mui/icons-material/Check';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Icon aliases
 const Truck = LocalShippingIcon;
@@ -65,6 +68,12 @@ const allColours: Array<{ value: string; label: string; hex: string; gradient: s
 
 export default function CheckoutPage() {
   const router = useRouter();
+
+  // Product Plan Price (Physical Card + Digital Profile)
+  const PRODUCT_PLAN_PRICE = 69;
+  // Linkist App Subscription (1 Year)
+  const APP_SUBSCRIPTION_PRICE = 120;
+
   const [cardConfig, setCardConfig] = useState<{
     fullName?: string;
     firstName?: string;
@@ -82,6 +91,12 @@ export default function CheckoutPage() {
   }>({});
   // PIN modal and related state removed - no longer needed
   // const [step, setStep] = useState<'shipping' | 'payment' | 'review'>('shipping');
+
+  // Voucher state
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
 
   const {
     register,
@@ -194,35 +209,92 @@ export default function CheckoutPage() {
 
   const calculatePricing = () => {
     // Get price based on selected material
-    const materialPrices = { pvc: 29, wood: 49, metal: 99, stainless_steel: 99 };
-    const basePrice = cardConfig?.baseMaterial ? materialPrices[cardConfig.baseMaterial] || 29 : 29;
-    const subtotal = basePrice * quantity;
+    const materialPrices: Record<string, number> = {
+      pvc: 69,
+      wood: 79,
+      metal: 99,
+      stainless_steel: 99,
+      digital: 19 // Digital Profile + Linkist App price
+    };
+    const materialPrice = cardConfig?.baseMaterial ? materialPrices[cardConfig.baseMaterial] || 69 : 69;
 
-    // Founder member discount (TODO: Fetch from admin settings)
-    const founderDiscountPercentage = 10; // 10% discount for founder members
-    const founderDiscount = isFounderMember ? (subtotal * founderDiscountPercentage) / 100 : 0;
-    const subtotalAfterDiscount = subtotal - founderDiscount;
+    // Only Material Price + App Subscription (no product plan)
+    const productPlanPrice = 0; // Removed
+    const appSubscriptionPrice = APP_SUBSCRIPTION_PRICE;
+    const basePrice = materialPrice; // Only material price
+    const subtotal = (basePrice + appSubscriptionPrice) * quantity;
 
-    // Tax logic: 18% GST for India, 5% VAT for others
+    // Tax logic: 18% GST for India, 5% VAT for others (applied only on physical items, not subscription)
     const isIndia = watchedValues.country === 'IN';
     const taxRate = isIndia ? 0.18 : 0.05;
-    const taxAmount = subtotalAfterDiscount * taxRate;
+    const taxableAmount = basePrice * quantity; // Tax only on material price
+    const taxAmount = taxableAmount * taxRate;
 
     // Shipping is included in base price (no additional cost)
     const shippingCost = 0;
-    const total = subtotalAfterDiscount + taxAmount + shippingCost;
+    const totalBeforeDiscount = subtotal + taxAmount + shippingCost;
+
+    // Apply voucher discount
+    const discountAmount = (totalBeforeDiscount * voucherDiscount) / 100;
+    const total = Math.max(0, totalBeforeDiscount - discountAmount);
 
     return {
+      productPlanPrice,
+      materialPrice,
+      appSubscriptionPrice,
       basePrice,
       subtotal,
-      founderDiscount,
-      founderDiscountPercentage,
       taxAmount,
       shippingCost,
+      totalBeforeDiscount,
+      discountAmount,
       total,
       taxRate,
       taxLabel: isIndia ? 'GST (18%)' : 'VAT (5%)'
     };
+  };
+
+  const validateVoucher = async () => {
+    if (!voucherCode.trim()) {
+      alert('Please enter a voucher code');
+      return;
+    }
+
+    setApplyingVoucher(true);
+    try {
+      const response = await fetch('/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: voucherCode.toUpperCase(),
+          orderAmount: pricing.totalBeforeDiscount || 0,
+          userEmail: watchedValues.email
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.valid && result.voucher) {
+        // Calculate discount percentage for display
+        const discountPercent = result.voucher.discount_type === 'percentage'
+          ? result.voucher.discount_value
+          : Math.round((result.voucher.discount_amount / (pricing.totalBeforeDiscount || 1)) * 100);
+
+        setVoucherDiscount(discountPercent);
+        setVoucherValid(true);
+      } else {
+        setVoucherDiscount(0);
+        setVoucherValid(false);
+        alert('Invalid voucher code');
+      }
+    } catch (error) {
+      console.error('Error validating voucher:', error);
+      setVoucherDiscount(0);
+      setVoucherValid(false);
+      alert('Error validating voucher. Please try again.');
+    } finally {
+      setApplyingVoucher(false);
+    }
   };
 
   // Helper functions for card preview
@@ -391,10 +463,20 @@ export default function CheckoutPage() {
           area: gpsCoordinates.area
         },
         pricing: {
+          productPlanPrice: pricing.productPlanPrice,
+          materialPrice: pricing.materialPrice,
+          appSubscriptionPrice: pricing.appSubscriptionPrice,
+          basePrice: pricing.basePrice,
           subtotal: pricing.subtotal,
           shippingCost: pricing.shippingCost,
           taxAmount: pricing.taxAmount,
-          total: pricing.total
+          totalBeforeDiscount: pricing.totalBeforeDiscount,
+          discountAmount: pricing.discountAmount,
+          total: pricing.total,
+          taxRate: pricing.taxRate,
+          taxLabel: pricing.taxLabel,
+          voucherCode: voucherCode || null,
+          voucherDiscount: voucherDiscount || 0
         },
         isFounderMember: formData.isFounderMember
       };
@@ -425,6 +507,8 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
+      <Navbar />
+
       {/* Full-page Loading Overlay */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -436,7 +520,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         {/* Checkout Header - Centered above everything */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Complete Your Order</h2>
@@ -681,11 +765,13 @@ export default function CheckoutPage() {
               
               {/* Card Preview */}
               <div className="mb-6">
-                <h4 className="font-medium mb-3">Your NFC Card</h4>
+                <h4 className="font-medium mb-3">
+                  {cardConfig?.baseMaterial === 'digital' ? 'Digital Profile + Linkist App' : 'Your NFC Card'}
+                </h4>
                 <p className="text-sm text-gray-600 mb-2">
                   {cardConfig?.fullName || 'Custom NFC Card'}
                 </p>
-                {cardConfig?.baseMaterial && (
+                {cardConfig?.baseMaterial && cardConfig.baseMaterial !== 'digital' && (
                   <p className="text-xs text-gray-500 mb-4">
                     Material: {cardConfig.baseMaterial.charAt(0).toUpperCase() + cardConfig.baseMaterial.slice(1)} •
                     Color: {(() => {
@@ -694,6 +780,11 @@ export default function CheckoutPage() {
                       const colorName = color.split('-')[0];
                       return colorName.charAt(0).toUpperCase() + colorName.slice(1);
                     })()}
+                  </p>
+                )}
+                {cardConfig?.baseMaterial === 'digital' && (
+                  <p className="text-xs text-gray-500 mb-4">
+                    Includes: Linkist App Access (1 Year) • AI Credits • Analytics Dashboard
                   </p>
                 )}
 
@@ -745,10 +836,22 @@ export default function CheckoutPage() {
 
               {/* Pricing Breakdown */}
               <div className="space-y-3 text-sm">
+                {/* Material Price Only */}
                 <div className="flex justify-between">
-                  <span>NFC Card × {quantity}</span>
-                  <span>${pricing.subtotal.toFixed(2)}</span>
+                  <span>
+                    {cardConfig?.baseMaterial
+                      ? `${cardConfig.baseMaterial.toUpperCase()} Card Material × ${quantity}`
+                      : `Card Material × ${quantity}`}
+                  </span>
+                  <span>${(pricing.materialPrice * quantity).toFixed(2)}</span>
                 </div>
+
+                {/* App Subscription */}
+                <div className="flex justify-between">
+                  <span>1 Year Linkist App Subscription × {quantity}</span>
+                  <span>${(pricing.appSubscriptionPrice * quantity).toFixed(2)}</span>
+                </div>
+
                 <div className="flex justify-between">
                   <span>Customization</span>
                   <span className="text-green-600">Included</span>
@@ -761,12 +864,60 @@ export default function CheckoutPage() {
                   <span>{pricing.taxLabel || 'VAT (5%)'}</span>
                   <span>${pricing.taxAmount.toFixed(2)}</span>
                 </div>
-                {isFounderMember && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Founder Member Benefits ({pricing.founderDiscountPercentage}% off)</span>
-                    <span>-${pricing.founderDiscount.toFixed(2)}</span>
+
+                {/* Voucher Section */}
+                <div className="border-t pt-3 mt-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Have a Voucher Code?
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                      placeholder="ENTER CODE"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={validateVoucher}
+                      disabled={applyingVoucher || !voucherCode.trim()}
+                      className="px-4 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
+                    >
+                      {applyingVoucher ? 'Applying...' : 'Apply'}
+                    </button>
+                  </div>
+
+                  {voucherValid === true && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                      <CheckIcon className="w-4 h-4 text-green-600 mt-0.5" />
+                      <div className="text-xs text-green-700">
+                        <p className="font-medium">Voucher Applied!</p>
+                        <p>You get {voucherDiscount}% off on your order</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {voucherValid === false && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                      <ErrorOutlineIcon className="w-4 h-4 text-red-600 mt-0.5" />
+                      <div className="text-xs text-red-700">
+                        <p className="font-medium">Invalid Voucher</p>
+                        <p>This voucher code is not valid or has expired</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Discount Line */}
+                {voucherDiscount > 0 && voucherValid && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Voucher Discount ({voucherDiscount}% off)</span>
+                    <span>-${pricing.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
+
                 <div className="border-t pt-3 flex justify-between font-semibold">
                   <span>Total</span>
                   <span>${pricing.total.toFixed(2)}</span>

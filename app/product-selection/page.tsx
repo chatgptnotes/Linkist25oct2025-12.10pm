@@ -193,7 +193,72 @@ export default function ProductSelectionPage() {
     // Route based on product type
     setTimeout(() => {
       if (selectedProduct === 'digital-only') {
-        // Digital Profile Only → Success page (no payment needed)
+        // Digital Profile Only → Create order data and redirect to success page
+        const userProfile = localStorage.getItem('userProfile');
+        let email = '';
+        let firstName = 'User';
+        let lastName = 'Name';
+        let phoneNumber = '';
+        let country = 'US';
+
+        if (userProfile) {
+          try {
+            const profile = JSON.parse(userProfile);
+            email = profile.email || '';
+            firstName = profile.firstName || 'User';
+            lastName = profile.lastName || 'Name';
+            phoneNumber = profile.mobile || '';
+            country = profile.country || 'US';
+          } catch (error) {
+            console.error('Error parsing user profile:', error);
+          }
+        }
+
+        // Create order data for digital-only product
+        const digitalOnlyPrice = 9;
+        const taxAmount = country === 'IN' ? digitalOnlyPrice * 0.18 : digitalOnlyPrice * 0.05;
+        const totalAmount = digitalOnlyPrice + taxAmount;
+
+        const digitalOnlyOrder = {
+          orderId: `digital-free-${Date.now()}`,
+          orderNumber: `DIG-FREE-${Date.now()}`,
+          customerName: `${firstName} ${lastName}`,
+          email,
+          phoneNumber,
+          cardConfig: {
+            firstName,
+            lastName,
+            baseMaterial: 'digital',
+            color: 'none',
+            quantity: 1,
+            isDigitalOnly: true,
+            fullName: `${firstName} ${lastName}`
+          },
+          shipping: {
+            fullName: `${firstName} ${lastName}`,
+            email,
+            phone: phoneNumber,
+            phoneNumber,
+            country,
+            addressLine1: 'N/A - Digital Product',
+            city: 'N/A',
+            postalCode: 'N/A',
+            isFounderMember: false
+          },
+          pricing: {
+            subtotal: digitalOnlyPrice,
+            taxAmount: taxAmount,
+            shippingCost: 0,
+            total: totalAmount
+          },
+          isDigitalProduct: true,
+          isDigitalOnly: true
+        };
+
+        // Store order confirmation for success page
+        localStorage.setItem('orderConfirmation', JSON.stringify(digitalOnlyOrder));
+
+        // Redirect to success page
         router.push('/nfc/success');
       } else if (selectedProduct === 'digital-with-app') {
         // Digital Profile + Linkist App → Payment page directly

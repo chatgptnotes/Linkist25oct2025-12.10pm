@@ -217,6 +217,9 @@ const SUB_DOMAINS = [
   { industry: 'Government & Public Sector', subDomains: [
     'Defense', 'Infrastructure', 'Public Policy', 'Civil Services'
   ]},
+  { industry: 'Nonprofit & NGOs', subDomains: [
+    'Social Services', 'Environmental', 'Education & Literacy', 'Healthcare', 'Advocacy & Human Rights'
+  ]},
   { industry: 'Hospitality & Travel', subDomains: [
     'Hotels & Resorts', 'Tourism', 'Airlines', 'Food Services'
   ]}
@@ -982,8 +985,7 @@ function ProfileBuilderContent() {
     { id: 'basic' as const, icon: Person, label: 'Basic Information', description: 'Update your personal details and contact preferences' },
     { id: 'professional' as const, icon: Briefcase, label: 'Professional Information', description: 'Build your professional presence and showcase your expertise' },
     { id: 'social' as const, icon: Share, label: 'Social & Digital Presence', description: 'Connect your social media accounts and showcase your digital footprint' },
-    { id: 'media-photo' as const, icon: Camera, label: 'Profile Photo & Background', description: 'Upload and customize your profile visuals for a professional appearance' },
-    { id: 'media-gallery' as const, icon: Collections, label: 'Media Gallery', description: 'Upload photos and videos to showcase your work and achievements' }
+    { id: 'media-photo' as const, icon: Camera, label: 'Profile Photo & Background', description: 'Upload and customize your profile visuals for a professional appearance' }
   ];
 
   return (
@@ -1531,7 +1533,7 @@ function ProfileBuilderContent() {
                             type="text"
                             value={profileData.industry}
                             onChange={(e) => {
-                              setProfileData({ ...profileData, industry: e.target.value });
+                              setProfileData({ ...profileData, industry: e.target.value, subDomain: '' });
                               setShowIndustryDropdown(true);
                             }}
                             onFocus={() => setShowIndustryDropdown(true)}
@@ -1564,7 +1566,7 @@ function ProfileBuilderContent() {
                                     key={industry}
                                     type="button"
                                     onClick={() => {
-                                      setProfileData({ ...profileData, industry });
+                                      setProfileData({ ...profileData, industry, subDomain: '' });
                                       setShowIndustryDropdown(false);
                                     }}
                                     className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
@@ -1592,52 +1594,55 @@ function ProfileBuilderContent() {
                               // Delay hiding to allow click on dropdown items
                               setTimeout(() => setShowSubDomainDropdown(false), 200);
                             }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                            placeholder="Type to search or enter custom sub-domain..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                            placeholder={profileData.industry ? "Type to search or enter custom sub-domain..." : "Select industry first..."}
+                            disabled={!profileData.industry}
                           />
 
                           {/* Live Search Dropdown - only show if there are matches */}
                           {(() => {
-                            // Check if there are any matching sub-domains
-                            const hasMatches = ALL_SUB_DOMAINS.some(subDomain =>
+                            // If no industry selected, don't show dropdown
+                            if (!profileData.industry || !showSubDomainDropdown) {
+                              return null;
+                            }
+
+                            // Find the selected industry's sub-domains
+                            const selectedIndustryData = SUB_DOMAINS.find(
+                              group => group.industry.toLowerCase() === profileData.industry.toLowerCase()
+                            );
+
+                            if (!selectedIndustryData) {
+                              return null;
+                            }
+
+                            // Filter sub-domains based on search text
+                            const filteredSubDomains = selectedIndustryData.subDomains.filter(subDomain =>
+                              profileData.subDomain.length === 0 ||
                               subDomain.toLowerCase().includes(profileData.subDomain.toLowerCase())
                             );
 
-                            // Only show dropdown if there are matches
-                            if (!showSubDomainDropdown || profileData.subDomain.length === 0 || !hasMatches) {
+                            if (filteredSubDomains.length === 0) {
                               return null;
                             }
 
                             return (
                               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                {SUB_DOMAINS.map((group) => {
-                                  const filteredSubDomains = group.subDomains.filter(subDomain =>
-                                    subDomain.toLowerCase().includes(profileData.subDomain.toLowerCase())
-                                  );
-
-                                  if (filteredSubDomains.length === 0) return null;
-
-                                  return (
-                                    <div key={group.industry}>
-                                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
-                                        {group.industry}
-                                      </div>
-                                      {filteredSubDomains.map((subDomain) => (
-                                        <button
-                                          key={subDomain}
-                                          type="button"
-                                          onClick={() => {
-                                            setProfileData({ ...profileData, subDomain });
-                                            setShowSubDomainDropdown(false);
-                                          }}
-                                          className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
-                                        >
-                                          {subDomain}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
+                                <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
+                                  {selectedIndustryData.industry}
+                                </div>
+                                {filteredSubDomains.map((subDomain) => (
+                                  <button
+                                    key={subDomain}
+                                    type="button"
+                                    onClick={() => {
+                                      setProfileData({ ...profileData, subDomain });
+                                      setShowSubDomainDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors text-sm"
+                                  >
+                                    {subDomain}
+                                  </button>
+                                ))}
                               </div>
                             );
                           })()}
@@ -2367,190 +2372,6 @@ function ProfileBuilderContent() {
                         </>
                       )}
                     </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Media Gallery Section */}
-            {activeSection === 'media-gallery' && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 rounded-t-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white/10 p-3 rounded-lg">
-                      <Collections className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">Media Gallery</h2>
-                      <p className="text-white/90 text-sm mt-1">{sections.find(s => s.id === 'media-gallery')?.description}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-8">
-                  {/* Photos */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-red-500 text-xl">📷</span>
-                        <h3 className="text-lg font-semibold text-gray-900">Photos</h3>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600">{profileData.photos.length} of 5 photos used</span>
-                        <button
-                          onClick={addPhoto}
-                          className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add Photo
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      {profileData.photos.map((photo) => (
-                        <div key={photo.id} className="group relative">
-                          <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden">
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${photo.title}&size=400&background=random`}
-                              alt={photo.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="mt-2">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900">{photo.title}</p>
-                              <div className="flex items-center gap-1">
-                                <button className="p-1 hover:bg-gray-100 rounded">
-                                  <Edit className="w-4 h-4 text-gray-600" />
-                                </button>
-                                <button
-                                  onClick={() => removePhoto(photo.id)}
-                                  className="p-1 hover:bg-red-100 rounded"
-                                >
-                                  <Trash className="w-4 h-4 text-red-600" />
-                                </button>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 mt-2">
-                              <label className="flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={photo.showPublicly}
-                                  onChange={(e) => {
-                                    const newPhotos = profileData.photos.map(p =>
-                                      p.id === photo.id ? { ...p, showPublicly: e.target.checked } : p
-                                    );
-                                    setProfileData({ ...profileData, photos: newPhotos });
-                                  }}
-                                  className="sr-only peer"
-                                />
-                                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                              </label>
-                              <span className="text-xs text-gray-700">Show publicly</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Add Photo Placeholder */}
-                      <button
-                        onClick={addPhoto}
-                        className="aspect-video bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 flex flex-col items-center justify-center transition-colors"
-                      >
-                        <Plus className="w-8 h-8 text-gray-400" />
-                        <span className="text-sm text-gray-600 mt-2">Add Photo</span>
-                        <span className="text-xs text-gray-500">JPG, PNG up to 5MB</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Videos */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-red-500 text-xl">🎥</span>
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Videos</h3>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs sm:text-sm text-gray-600">{profileData.videos.length} of 3 videos used</span>
-                        <button
-                          onClick={addVideo}
-                          className="px-3 sm:px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span className="hidden sm:inline">Add Video</span>
-                          <span className="sm:hidden">Add</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {profileData.videos.map((video) => (
-                        <div key={video.id} className="group">
-                          <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center relative">
-                            <YouTube className="w-8 h-8 text-red-600" />
-                            <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded">YouTube</div>
-                            <button className="absolute inset-0 flex items-center justify-center bg-black/50 hover:bg-black/70 transition-colors">
-                              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                                <svg className="w-8 h-8 text-gray-900 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z"/>
-                                </svg>
-                              </div>
-                            </button>
-                          </div>
-                          <div className="mt-2">
-                            <p className="text-sm font-medium text-gray-900">{video.title}</p>
-                            <p className="text-xs text-gray-600 mt-1">3:45 min</p>
-                            <input
-                              type="url"
-                              value={video.url}
-                              onChange={(e) => {
-                                const newVideos = profileData.videos.map(v =>
-                                  v.id === video.id ? { ...v, url: e.target.value } : v
-                                );
-                                setProfileData({ ...profileData, videos: newVideos });
-                              }}
-                              className="w-full px-3 py-2 mt-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                              placeholder="Video URL"
-                            />
-                            <div className="flex items-center gap-2 mt-2">
-                              <label className="flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={video.showPublicly}
-                                  onChange={(e) => {
-                                    const newVideos = profileData.videos.map(v =>
-                                      v.id === video.id ? { ...v, showPublicly: e.target.checked } : v
-                                    );
-                                    setProfileData({ ...profileData, videos: newVideos });
-                                  }}
-                                  className="sr-only peer"
-                                />
-                                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                              </label>
-                              <span className="text-xs text-gray-700">Show publicly</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Add Video Placeholder */}
-                      <button
-                        onClick={addVideo}
-                        className="aspect-video bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 flex flex-col items-center justify-center transition-colors"
-                      >
-                        <Plus className="w-8 h-8 text-gray-400" />
-                        <span className="text-sm text-gray-600 mt-2">Add Video</span>
-                        <span className="text-xs text-gray-500 mt-1">YouTube or Vimeo</span>
-                        <div className="flex items-center gap-2 mt-2">
-                          <YouTube className="w-4 h-4 text-red-600" />
-                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197c1.185-1.044 2.351-2.084 3.501-3.128C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.265-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.013.01z"/>
-                          </svg>
-                        </div>
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

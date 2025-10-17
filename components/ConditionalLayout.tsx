@@ -49,7 +49,8 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
                       pathname.startsWith('/verify-login') ||
                       pathname.startsWith('/login') ||
                       pathname.startsWith('/profiles/preview') ||
-                      pathname.startsWith('/profiles/builder');
+                      pathname.startsWith('/profiles/builder') ||
+                      pathname.startsWith('/claim-url');
 
   useEffect(() => {
     // Check authentication status
@@ -94,6 +95,11 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   // For inner pages, render with simple header (only logo + logout after onboarding)
   if (isInnerPage) {
+    // Special case: claim-url and profiles/preview pages have their own logo header, don't add header from layout
+    if (pathname.startsWith('/claim-url') || pathname.startsWith('/profiles/preview')) {
+      return <>{children}</>;
+    }
+
     // Only show logout on these pages (after user has completed onboarding)
     const showLogout = pathname.startsWith('/product-selection') ||
                        pathname.startsWith('/nfc/') ||
@@ -128,6 +134,23 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   // Check if it's the landing or home page (which has its own footer and navbar)
   const isLandingPage = pathname === '/';
+
+  // Check if it's a dynamic username route (e.g., /bhu-bala)
+  // Username routes are single-level paths that don't match any known routes
+  const knownRoutes = ['/admin', '/api', '/checkout', '/confirm-payment', '/thank-you', '/account',
+                       '/profile-dashboard', '/verify-email', '/nfc', '/product-selection', '/choose-plan',
+                       '/welcome-to-linkist', '/verify-mobile', '/verify-login', '/login', '/register',
+                       '/profiles', '/claim-url', '/help', '/contact', '/about', '/pricing', '/features',
+                       '/founding-member', '/templates', '/new-card', '/_next', '/favicon'];
+
+  const isUsernameRoute = pathname !== '/' &&
+                          !pathname.includes('/', 1) && // Single level route (no additional slashes)
+                          !knownRoutes.some(route => pathname.startsWith(route));
+
+  // For username routes, render children only (page has its own header)
+  if (isUsernameRoute) {
+    return <>{children}</>;
+  }
 
   // For normal routes, render with navbar and footer (except landing/home page)
   return (

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
+import Logo from '@/components/Logo';
 import {
   CheckCircle,
   Email,
@@ -18,7 +20,9 @@ import {
   LocationOn,
   Star,
   Link as LinkIcon,
-  ContentCopy
+  ContentCopy,
+  QrCode2,
+  CloudDownload
 } from '@mui/icons-material';
 
 interface ProfileData {
@@ -65,6 +69,8 @@ export default function ProfilePreviewPage() {
   const [loading, setLoading] = useState(true);
   const [customUrl, setCustomUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [showQrCode, setShowQrCode] = useState(false);
 
   useEffect(() => {
     // Get custom URL from localStorage
@@ -180,6 +186,31 @@ export default function ProfilePreviewPage() {
     fetchProfileData();
   }, []);
 
+  // Generate QR Code when custom URL is set
+  useEffect(() => {
+    const generateQrCode = async () => {
+      if (!customUrl) return;
+
+      try {
+        const qrDataUrl = await QRCode.toDataURL(customUrl, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        setQrCodeUrl(qrDataUrl);
+      } catch (error) {
+        console.error('Error generating QR code:', error);
+      }
+    };
+
+    if (customUrl) {
+      generateQrCode();
+    }
+  }, [customUrl]);
+
   const handleCopyUrl = async () => {
     if (!customUrl) return;
 
@@ -189,6 +220,43 @@ export default function ProfilePreviewPage() {
       setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
     } catch (error) {
       console.error('Failed to copy URL:', error);
+    }
+  };
+
+  const handleDownloadQrCode = () => {
+    if (!qrCodeUrl) return;
+
+    const a = document.createElement('a');
+    a.href = qrCodeUrl;
+    a.download = `profile-qr-code.png`;
+    a.click();
+  };
+
+  const handleShareQrCode = async () => {
+    if (!qrCodeUrl) return;
+
+    try {
+      // Convert data URL to blob
+      const response = await fetch(qrCodeUrl);
+      const blob = await response.blob();
+      const file = new File([blob], 'qr-code.png', { type: 'image/png' });
+
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Profile QR Code',
+          text: `Scan this QR code to view my profile: ${customUrl}`
+        });
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText(customUrl);
+        alert('QR code sharing not supported. URL copied to clipboard!');
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Error sharing QR code:', error);
+        alert('Failed to share QR code');
+      }
     }
   };
 
@@ -221,31 +289,26 @@ export default function ProfilePreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Simple Logo-only Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Profile Preview</h1>
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <button
-                onClick={() => router.push('/profiles/builder')}
-                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm sm:text-base text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap cursor-pointer"
-              >
-                Edit Profile
-              </button>
-              <button
-                onClick={() => router.push('/choose-plan')}
-                className="flex-1 sm:flex-none px-4 sm:px-6 py-2 text-sm sm:text-base bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium whitespace-nowrap cursor-pointer"
-              >
-                Continue to Plan
-              </button>
-            </div>
-          </div>
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
+          <Logo width={140} height={45} variant="light" />
         </div>
       </div>
 
       {/* Profile Card */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {/* Profile Preview Header with Actions */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-0">Profile Preview</h1>
+          <button
+            onClick={() => router.push('/profiles/builder')}
+            className="w-full sm:w-auto px-4 py-2 text-sm text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+          >
+            Edit Profile
+          </button>
+        </div>
+
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           {/* Background Image */}
           {profileData.showBackgroundImage && profileData.backgroundImage ? (
@@ -278,18 +341,13 @@ export default function ProfilePreviewPage() {
                 <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 capitalize">
                   {profileData.firstName} {profileData.lastName}
                 </h1>
-
-                {/* Job Title & Professional Summary */}
-                <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
-                  {profileData.jobTitle && (
-                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
-                      {profileData.jobTitle}
-                      {profileData.companyName && ` @${profileData.companyName}`}
-                      {profileData.professionalSummary && ` | ${profileData.professionalSummary}`}
-                    </p>
-                  )}
-                </div>
-
+                 {/* Job Title */}
+                 {profileData.jobTitle && (
+                  <p className="text-sm sm:text-base text-gray-700 mb-2">
+                    {profileData.jobTitle}
+                    {profileData.companyName && ` @${profileData.companyName}`}
+                  </p>
+                )}
                 {/* Company & Industry */}
                 <div className="space-y-1 text-xs sm:text-sm text-gray-600">
                   {profileData.companyName && profileData.industry && (
@@ -301,37 +359,6 @@ export default function ProfilePreviewPage() {
                     <p>{profileData.subDomain}</p>
                   )}
                 </div>
-
-                {/* Custom URL Section */}
-                {customUrl && (
-                  <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <LinkIcon className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs font-semibold text-gray-700">Your Profile URL</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={customUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium break-all flex-1"
-                      >
-                        {customUrl}
-                      </a>
-                      <button
-                        onClick={handleCopyUrl}
-                        className="flex-shrink-0 p-1.5 bg-white border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition"
-                        title="Copy URL"
-                      >
-                        {copied ? (
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <ContentCopy className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Company Logo - Right side */}
@@ -345,8 +372,16 @@ export default function ProfilePreviewPage() {
             {/* Divider */}
             <div className="border-t border-gray-200 my-6 sm:my-8"></div>
 
+            {/* Professional Summary Section */}
+            {profileData.professionalSummary && (
+              <div className="mb-6 sm:mb-8">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Professional Summary</h3>
+                <p className="text-sm sm:text-base text-gray-700 leading-relaxed text-justify">{profileData.professionalSummary}</p>
+              </div>
+            )}
+
             {/* Contact Information Section */}
-            <div id="contact-section" className="mb-6 sm:mb-8">
+            <div id="contact-section" className="mb-8 sm:mb-8">
               <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Contact Information</h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -406,6 +441,48 @@ export default function ProfilePreviewPage() {
                 </div>
               </div>
             </div>
+
+            {/* Your Profile URL Section */}
+            {customUrl && (
+              <div className="mb-6 sm:mb-8">
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-semibold text-gray-900">Your Profile URL</span>
+                    </div>
+                    <button
+                      onClick={() => setShowQrCode(true)}
+                      className="flex-shrink-0 p-2 bg-white border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition"
+                      title="Show QR Code"
+                    >
+                      <QrCode2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={customUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium break-all flex-1"
+                    >
+                      {customUrl}
+                    </a>
+                    <button
+                      onClick={handleCopyUrl}
+                      className="flex-shrink-0 p-2 bg-white border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition"
+                      title="Copy URL"
+                    >
+                      {copied ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <ContentCopy className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Social Media Links */}
             {(profileData.showLinkedin || profileData.showInstagram || profileData.showFacebook ||
@@ -502,6 +579,60 @@ export default function ProfilePreviewPage() {
           </button>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQrCode && qrCodeUrl && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+          onClick={() => setShowQrCode(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Profile QR Code</h3>
+              <button
+                onClick={() => setShowQrCode(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <img
+                src={qrCodeUrl}
+                alt="Profile QR Code"
+                className="w-64 h-64 border-2 border-blue-300 rounded-lg bg-white p-4"
+              />
+              <p className="text-sm text-gray-600 mt-4 text-center">
+                Scan this QR code to visit this profile
+              </p>
+
+              <div className="flex gap-3 mt-6 w-full">
+                <button
+                  onClick={handleDownloadQrCode}
+                  className="flex-1 px-4 py-3 text-white rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 font-medium border-2 border-red-600"
+                  style={{ backgroundColor: '#dc2626' }}
+                >
+                  <CloudDownload className="w-5 h-5" />
+                  Download
+                </button>
+                <button
+                  onClick={handleShareQrCode}
+                  className="flex-1 px-4 py-3 text-white rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 font-medium border-2 border-red-600"
+                  style={{ backgroundColor: '#dc2626' }}
+                >
+                  <Star className="w-5 h-5" />
+                  Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

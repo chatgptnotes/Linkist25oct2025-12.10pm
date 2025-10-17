@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import PersonIcon from '@mui/icons-material/Person';
+import Logo from '@/components/Logo';
 
 const CheckCircle = CheckCircleIcon;
 const Info = InfoIcon;
@@ -194,8 +195,16 @@ export default function ClaimURLPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Simple Logo-only Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
+          <Logo width={140} height={45} variant="light" />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center p-4 min-h-[calc(100vh-80px)]">
+        <div className="max-w-2xl w-full">
         {/* Claim URL Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
@@ -211,7 +220,7 @@ export default function ClaimURLPage() {
             </label>
             <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden focus-within:border-blue-500 transition-colors">
               <span className="bg-gray-100 text-gray-600 px-4 py-3 text-sm font-medium border-r border-gray-300">
-                linkist.com/
+                {process.env.NEXT_PUBLIC_BASE_DOMAIN || 'linkist.com'}/
               </span>
               <input
                 type="text"
@@ -238,7 +247,7 @@ export default function ClaimURLPage() {
             {isAvailable && username && !errorMessage && (
               <p className="text-green-600 text-sm mt-2 flex items-center">
                 <CheckCircle className="h-4 w-4 mr-1" />
-                Sweet! linkist.com/{username} is available.
+                Sweet! {process.env.NEXT_PUBLIC_BASE_DOMAIN || 'linkist.com'}/{username} is available.
               </p>
             )}
 
@@ -302,6 +311,7 @@ export default function ClaimURLPage() {
             Claim URL
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

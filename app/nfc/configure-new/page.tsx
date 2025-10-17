@@ -35,8 +35,8 @@ export default function ConfigureNewPage() {
   ];
 
   const materials = [
-    { id: 'pvc', name: 'PVC', price: 29, description: 'Lightweight, durable and cost-effective' },
-    { id: 'wood', name: 'Wood', price: 49, description: 'Natural texture with sustainable appeal' },
+    { id: 'pvc', name: 'PVC', price: 69, description: 'Lightweight, durable and cost-effective' },
+    { id: 'wood', name: 'Wood', price: 79, description: 'Natural texture with sustainable appeal' },
     { id: 'stainless_steel', name: 'Stainless Steel', price: 99, description: 'Premium metal finish with ultimate durability', selected: true }
   ];
 
@@ -59,7 +59,7 @@ export default function ConfigureNewPage() {
   ];
 
   const getPrice = () => {
-    const basePrices = { pvc: 29, wood: 49, stainless_steel: 99 };
+    const basePrices = { pvc: 69, wood: 79, stainless_steel: 99 };
     return basePrices[formData.baseMaterial];
   };
 
