@@ -105,7 +105,6 @@ export async function POST(request: NextRequest) {
       display_settings: data.displaySettings || data.display_settings || {},
       gallery_urls: data.gallery_urls || [],
       document_urls: data.document_urls || [],
-      status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }

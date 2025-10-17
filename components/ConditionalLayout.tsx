@@ -8,6 +8,7 @@ import Footer from './Footer';
 import Logo from './Logo';
 import UserProfileDropdown from './UserProfileDropdown';
 import LogoutIcon from '@mui/icons-material/Logout';
+import { toast } from 'sonner';
 
 // Icon aliases
 const LogOut = LogoutIcon;
@@ -79,12 +80,31 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   const handleLogout = async () => {
     try {
+      // Clear localStorage
+      localStorage.removeItem('userOnboarded');
+      localStorage.removeItem('userProfile');
+      localStorage.removeItem('session');
+      localStorage.removeItem('claimedUsername');
+      localStorage.removeItem('profileUrl');
+      localStorage.removeItem('productSelection');
+      localStorage.removeItem('pendingOrder');
+      localStorage.removeItem('orderConfirmation');
+
+      // Call logout API
       await fetch('/api/auth/logout', { method: 'POST' });
-      localStorage.clear();
+
+      // Clear cookies
       document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+      // Show success message
+      toast.success('Logged out successfully!');
+
+      // Redirect to home
       router.push('/');
     } catch (error) {
       console.error('Logout error:', error);
+      toast.error('Logout failed. Please try again.');
     }
   };
 
@@ -121,7 +141,28 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
             <Link href="/">
               <Logo width={100} height={32} noLink={true} variant="light" />
             </Link>
-            {userData && !isAuthPage && <UserProfileDropdown user={userData} />}
+            {userData && !isAuthPage && showLogout && (
+              <div className="flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-semibold">
+                    {userData.first_name && userData.last_name
+                      ? `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase()
+                      : userData.email?.[0].toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-sm text-gray-700">
+                    {userData.first_name && userData.last_name
+                      ? `${userData.first_name} ${userData.last_name}`
+                      : userData.email?.split('@')[0] || 'User'}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </header>
         <main className="pt-16 flex-grow min-h-0">

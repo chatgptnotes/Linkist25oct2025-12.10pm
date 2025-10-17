@@ -18,7 +18,8 @@ export default function VerifyRegisterPage() {
   const { showToast } = useToast();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Email or mobile
+  const [registrationType, setRegistrationType] = useState<'email' | 'mobile'>('email');
   const [devOtp, setDevOtp] = useState('');
   const [registrationData, setRegistrationData] = useState<any>(null);
 
@@ -29,10 +30,11 @@ export default function VerifyRegisterPage() {
       router.push('/register');
       return;
     }
-    
+
     const parsedData = JSON.parse(data);
     setRegistrationData(parsedData);
-    setEmail(parsedData.email);
+    setRegistrationType(parsedData.registrationType || 'email');
+    setIdentifier(parsedData.email || parsedData.mobile);
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,12 +42,16 @@ export default function VerifyRegisterPage() {
     setLoading(true);
 
     try {
+      const requestBody = registrationType === 'email'
+        ? { email: identifier, otp }
+        : { mobile: identifier, otp };
+
       const response = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -71,24 +77,33 @@ export default function VerifyRegisterPage() {
 
   const handleResendCode = async () => {
     try {
+      const requestBody = registrationType === 'email'
+        ? {
+            email: identifier,
+            firstName: registrationData?.firstName,
+            lastName: registrationData?.lastName
+          }
+        : {
+            mobile: identifier,
+            firstName: registrationData?.firstName,
+            lastName: registrationData?.lastName
+          };
+
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          email,
-          firstName: registrationData?.firstName,
-          lastName: registrationData?.lastName
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        showToast('Verification code resent!', 'success');
-        if (data.otp && process.env.NODE_ENV === 'development') {
-          setDevOtp(data.otp);
+        const medium = registrationType === 'email' ? 'email' : 'mobile number';
+        showToast(`Verification code resent to your ${medium}!`, 'success');
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
         }
       } else {
         showToast(data.error || 'Failed to resend code', 'error');
@@ -108,11 +123,11 @@ export default function VerifyRegisterPage() {
           </Link>
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          Verify your email
+          Verify your {registrationType === 'email' ? 'email' : 'mobile number'}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           We sent a verification code to{' '}
-          <span className="font-medium text-gray-900">{email}</span>
+          <span className="font-medium text-gray-900">{identifier}</span>
         </p>
         <p className="mt-1 text-center text-xs text-gray-500">
           Complete your account registration

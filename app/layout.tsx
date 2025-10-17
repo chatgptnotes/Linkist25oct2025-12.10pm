@@ -5,6 +5,7 @@ import GDPRConsentBanner from '@/components/gdpr-consent-banner';
 import { ToastProvider } from '@/components/ToastProvider';
 import AdminInitializer from '@/components/AdminInitializer';
 import ConditionalLayout from '@/components/ConditionalLayout';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -50,6 +51,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased bg-black min-h-screen flex flex-col m-0 p-0`}>
         <AdminInitializer />
+        <Toaster position="top-center" richColors />
         <ToastProvider>
           <ConditionalLayout>
             {children}

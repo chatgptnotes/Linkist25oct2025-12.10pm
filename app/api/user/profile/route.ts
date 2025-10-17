@@ -42,7 +42,22 @@ export async function POST(request: NextRequest) {
         role: 'user'
       });
 
-      console.log('✅ Profile saved successfully to database:', user.id);
+      console.log('✅ User saved successfully to database:', user.id);
+
+      // Create/update profile entry linked to this user
+      try {
+        const profile = await SupabaseUserStore.createOrUpdateProfile(user.id, {
+          email: user.email,
+          first_name: firstName || undefined,
+          last_name: lastName || undefined,
+          phone: mobile || undefined,
+        });
+
+        console.log('✅ Profile linked successfully:', profile.id);
+      } catch (profileError) {
+        console.error('⚠️ Profile creation error (non-fatal):', profileError);
+        // Don't fail the request if profile creation fails
+      }
 
       return NextResponse.json({
         success: true,

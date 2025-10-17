@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export interface EmailOTPRecord {
   id?: string;
+  user_id?: string | null;
   email: string;
   otp: string;
   expires_at: string;
@@ -12,6 +13,7 @@ export interface EmailOTPRecord {
 
 export interface MobileOTPRecord {
   id?: string;
+  user_id?: string | null;
   mobile: string;
   otp: string;
   expires_at: string;
@@ -49,6 +51,7 @@ export const SupabaseEmailOTPStore = {
       const { error } = await supabase
         .from('email_otps')
         .insert([{
+          user_id: record.user_id || null,
           email: record.email,
           otp: record.otp,
           expires_at: record.expires_at,
@@ -179,6 +182,7 @@ export const SupabaseMobileOTPStore = {
       const { error } = await supabase
         .from('mobile_otps')
         .insert([{
+          user_id: record.user_id || null,
           mobile: record.mobile,
           otp: record.otp,
           expires_at: record.expires_at,

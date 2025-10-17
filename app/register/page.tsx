@@ -11,6 +11,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PhoneIcon from '@mui/icons-material/Phone';
 
 // Icon aliases
 const Mail = EmailIcon;
@@ -19,14 +20,18 @@ const Eye = VisibilityIcon;
 const EyeOff = VisibilityOffIcon;
 const User = PersonIcon;
 const ArrowLeft = ArrowBackIcon;
+const Phone = PhoneIcon;
 
 export default function RegisterPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const [registrationType, setRegistrationType] = useState<'email' | 'mobile'>('email');
+  const [countryCode, setCountryCode] = useState('+91'); // Default to India
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    mobile: '',
     password: '',
     confirmPassword: ''
   });
@@ -46,10 +51,18 @@ export default function RegisterPage() {
       newErrors.lastName = 'Last name is required';
     }
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+    if (registrationType === 'email') {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Email is invalid';
+      }
+    } else {
+      if (!formData.mobile.trim()) {
+        newErrors.mobile = 'Mobile number is required';
+      } else if (!/^\d{7,15}$/.test(formData.mobile.replace(/\s/g, ''))) {
+        newErrors.mobile = 'Invalid mobile number';
+      }
     }
 
     if (!formData.password) {
@@ -68,7 +81,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -76,17 +89,25 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // Send OTP for email verification
+      // Send OTP for verification (email or mobile)
+      const requestBody = registrationType === 'email'
+        ? {
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName
+          }
+        : {
+            mobile: `${countryCode}${formData.mobile}`,
+            firstName: formData.firstName,
+            lastName: formData.lastName
+          };
+
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -94,16 +115,19 @@ export default function RegisterPage() {
       if (response.ok) {
         // Show OTP in popup if available (for development/demo)
         if (data.devOtp) {
-          alert(`📧 Your verification code is:\n\n${data.devOtp}\n\nPlease copy this code for the next step.`);
+          alert(`📱 Your verification code is:\n\n${data.devOtp}\n\nPlease copy this code for the next step.`);
         } else {
-          showToast('Verification code sent to your email!', 'success');
+          const medium = registrationType === 'email' ? 'email' : 'mobile number';
+          showToast(`Verification code sent to your ${medium}!`, 'success');
         }
         // Store registration data for verification
         localStorage.setItem('registrationData', JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password
+          email: registrationType === 'email' ? formData.email : '',
+          mobile: registrationType === 'mobile' ? `${countryCode}${formData.mobile}` : '',
+          password: formData.password,
+          registrationType
         }));
         router.push('/verify-register');
       } else {
@@ -136,6 +160,36 @@ export default function RegisterPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {/* Registration Type Toggle */}
+          <div className="mb-6">
+            <div className="flex rounded-lg border border-gray-300 p-1 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setRegistrationType('email')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  registrationType === 'email'
+                    ? 'bg-white text-red-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Mail className="h-4 w-4 inline mr-2" />
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setRegistrationType('mobile')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  registrationType === 'mobile'
+                    ? 'bg-white text-red-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Phone className="h-4 w-4 inline mr-2" />
+                Mobile
+              </button>
+            </div>
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -193,32 +247,83 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+            {/* Email or Mobile Field - Conditional */}
+            {registrationType === 'email' ? (
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email address
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className={`appearance-none block w-full pl-10 pr-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm ${
+                      errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter your email"
+                  />
                 </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`appearance-none block w-full pl-10 pr-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter your email"
-                />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
+            ) : (
+              <div>
+                <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">
+                  Mobile number
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="appearance-none px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm bg-gray-50"
+                    style={{ width: '100px' }}
+                  >
+                    <option value="+91">🇮🇳 +91</option>
+                    <option value="+971">🇦🇪 +971</option>
+                    <option value="+1">🇺🇸 +1</option>
+                    <option value="+44">🇬🇧 +44</option>
+                    <option value="+966">🇸🇦 +966</option>
+                    <option value="+974">🇶🇦 +974</option>
+                    <option value="+968">🇴🇲 +968</option>
+                    <option value="+965">🇰🇼 +965</option>
+                    <option value="+973">🇧🇭 +973</option>
+                  </select>
+                  <div className="flex-1 relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="mobile"
+                      name="mobile"
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={formData.mobile}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setFormData({ ...formData, mobile: value });
+                      }}
+                      className={`appearance-none block w-full pl-10 pr-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm ${
+                        errors.mobile ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter mobile number"
+                    />
+                  </div>
+                </div>
+                {errors.mobile && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mobile}</p>
+                )}
+              </div>
+            )}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">

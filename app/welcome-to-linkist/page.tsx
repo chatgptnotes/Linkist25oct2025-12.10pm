@@ -151,8 +151,20 @@ export default function WelcomeToLinkist() {
   };
 
   const handleReject = async () => {
-    // Log out and redirect
-    await fetch('/api/auth/logout', { method: 'POST' });
+    // Clear all local storage data
+    localStorage.removeItem('userOnboarded');
+    localStorage.removeItem('userProfile');
+    localStorage.removeItem('session');
+
+    // Call logout API to clear server-side session and cookies
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout API error (non-fatal):', error);
+      // Continue with redirect even if logout API fails
+    }
+
+    // Redirect to home page
     router.push('/');
   };
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import twilio from 'twilio';
 import { SupabaseMobileOTPStore, generateMobileOTP, cleanExpiredOTPs } from '@/lib/supabase-otp-store';
+import { SupabaseUserStore } from '@/lib/supabase-user-store';
 import { rateLimitMiddleware, RateLimits, getClientIdentifier } from '@/lib/rate-limit';
 import { checkSpamAndBots } from '@/lib/spam-detection';
 
@@ -81,8 +82,21 @@ export async function POST(request: NextRequest) {
       const otp = generateMobileOTP();
       const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
+      // Try to find user by phone number to link OTP
+      let userId: string | null = null;
+      try {
+        const user = await SupabaseUserStore.getByPhone(mobile);
+        if (user) {
+          userId = user.id;
+          console.log('📱 Found user for mobile OTP:', userId);
+        }
+      } catch (error) {
+        console.log('📱 No existing user found for mobile, will create guest OTP');
+      }
+
       await cleanExpiredOTPs();
       const stored = await SupabaseMobileOTPStore.set(mobile, {
+        user_id: userId,
         mobile,
         otp,
         expires_at: expiresAt,
@@ -97,7 +111,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log(`📱 Mobile OTP for ${mobile}: ${otp} (stored in database)`);
+      console.log(`📱 Mobile OTP for ${mobile}: ${otp} (stored in database, user_id: ${userId || 'guest'})`);
 
       return NextResponse.json({
         success: true,
@@ -166,15 +180,27 @@ export async function POST(request: NextRequest) {
       const otp = generateMobileOTP();
       const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
+      // Try to find user by phone number to link OTP
+      let userId: string | null = null;
+      try {
+        const user = await SupabaseUserStore.getByPhone(mobile);
+        if (user) {
+          userId = user.id;
+        }
+      } catch (error) {
+        // Guest OTP
+      }
+
       await cleanExpiredOTPs();
       await SupabaseMobileOTPStore.set(mobile, {
+        user_id: userId,
         mobile,
         otp,
         expires_at: expiresAt,
         verified: false
       });
 
-      console.log(`📱 Fallback OTP for ${mobile}: ${otp}`);
+      console.log(`📱 Fallback OTP for ${mobile}: ${otp} (user_id: ${userId || 'guest'})`);
 
       return NextResponse.json({
         success: true,

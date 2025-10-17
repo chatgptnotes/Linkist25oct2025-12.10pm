@@ -83,7 +83,7 @@ export default function CheckoutPage() {
     [key: string]: any;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(false); // Map hidden by default
   const [gpsCoordinates, setGpsCoordinates] = useState<{
     latitude?: number;
     longitude?: number;
@@ -421,6 +421,7 @@ export default function CheckoutPage() {
   };
 
   const processOrder = async (formData: CheckoutForm) => {
+    setShowMap(false); // Force hide map immediately on submit
     setIsLoading(true);
     try {
       console.log('💳 Checkout: Processing order with form data:', formData);
@@ -511,8 +512,8 @@ export default function CheckoutPage() {
 
       {/* Full-page Loading Overlay */}
       {isLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl p-8 shadow-2xl text-center">
+        <div className="fixed inset-0 bg-white bg-opacity-98 z-[9999] flex items-center justify-center backdrop-blur-md">
+          <div className="bg-white rounded-xl p-8 shadow-2xl text-center border border-gray-200">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-red-500 border-t-transparent mx-auto mb-4"></div>
             <p className="text-lg font-semibold text-gray-900">Processing your order...</p>
             <p className="text-sm text-gray-600 mt-2">Please wait, redirecting to payment page</p>
@@ -520,7 +521,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 transition-opacity duration-300 ${isLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {/* Checkout Header - Centered above everything */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Complete Your Order</h2>
@@ -613,8 +614,8 @@ export default function CheckoutPage() {
                   </button>
                 </div>
 
-                {/* Map Picker */}
-                {showMap && (
+                {/* Map Picker - Only shows when user clicks "Use Map" button AND not loading */}
+                {!isLoading && showMap && (
                   <div className="mb-4">
                     <MapPicker
                       initialAddress={{

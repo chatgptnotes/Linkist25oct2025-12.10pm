@@ -220,4 +220,77 @@ export const SupabaseUserStore = {
 
     return data
   },
+
+  /**
+   * Create or update user profile in profiles table
+   * This links the user to their digital profile
+   */
+  createOrUpdateProfile: async (userId: string, profileData: {
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    company?: string;
+  }): Promise<any> => {
+    console.log('👤 [SupabaseUserStore.createOrUpdateProfile] Creating/updating profile for user:', userId);
+
+    const supabase = createAdminClient()
+
+    // Check if profile already exists
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .single()
+
+    if (existingProfile) {
+      console.log('👤 [SupabaseUserStore.createOrUpdateProfile] Profile exists, updating:', existingProfile.id);
+
+      // Update existing profile
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: profileData.first_name || null,
+          last_name: profileData.last_name || null,
+          phone_number: profileData.phone || null,
+          company: profileData.company || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ [SupabaseUserStore.createOrUpdateProfile] Update error:', error)
+        throw new Error(`Failed to update profile: ${error.message}`)
+      }
+
+      return data
+    }
+
+    // Create new profile
+    console.log('👤 [SupabaseUserStore.createOrUpdateProfile] Creating new profile');
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId, // Use user ID as profile ID for easy linking
+        user_id: userId,
+        email: profileData.email,
+        first_name: profileData.first_name || null,
+        last_name: profileData.last_name || null,
+        phone_number: profileData.phone || null,
+        company: profileData.company || null
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ [SupabaseUserStore.createOrUpdateProfile] Create error:', error)
+      throw new Error(`Failed to create profile: ${error.message}`)
+    }
+
+    console.log('✅ [SupabaseUserStore.createOrUpdateProfile] Profile created successfully:', data.id)
+    return data
+  },
 }

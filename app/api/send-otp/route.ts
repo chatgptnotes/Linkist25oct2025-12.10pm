@@ -7,8 +7,166 @@ import twilio from 'twilio';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { emailOrPhone } = body;
+    const { emailOrPhone, email, mobile, firstName, lastName } = body;
 
+    // New registration flow (has email OR mobile with firstName/lastName)
+    const isNewRegistration = (email || mobile) && firstName && lastName;
+
+    // If it's a new registration
+    if (isNewRegistration) {
+      const identifier = email || mobile;
+      const isEmail = !!email;
+      const isPhone = !!mobile;
+
+      console.log('🆕 New registration detected for:', identifier);
+
+      // Clean expired OTPs first
+      await cleanExpiredOTPs();
+
+      if (isEmail && email) {
+        // Email registration
+        console.log('📧 Email registration, sending OTP to:', email);
+
+        // Check if SMTP is configured
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
+
+        if (!smtpUser || !smtpPass) {
+          return NextResponse.json(
+            { error: 'Email service not configured' },
+            { status: 503 }
+          );
+        }
+
+        // Generate OTP
+        const otp = generateEmailOTP();
+        const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
+
+        // Store OTP in Supabase (without user_id for new registration)
+        const stored = await SupabaseEmailOTPStore.set(email, {
+          user_id: null,
+          email,
+          otp,
+          expires_at: expiresAt,
+          verified: false
+        });
+
+        if (!stored) {
+          console.error('Failed to store OTP in database');
+          return NextResponse.json(
+            { error: 'Failed to store verification code' },
+            { status: 500 }
+          );
+        }
+
+        // Send email OTP
+        try {
+          const emailResult = await sendOTPEmail({
+            to: email,
+            otp,
+            expiresInMinutes: 10
+          });
+
+          if (!emailResult.success) {
+            console.error('❌ Email sending failed:', emailResult.error);
+            if (process.env.NODE_ENV === 'production') {
+              throw new Error(emailResult.error);
+            }
+          } else {
+            console.log('✅ Email sent successfully');
+          }
+        } catch (error) {
+          console.error('❌ Failed to send email:', error);
+          if (process.env.NODE_ENV === 'production') {
+            return NextResponse.json(
+              { error: 'Failed to send verification email' },
+              { status: 500 }
+            );
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'Verification code sent to your email',
+          type: 'email',
+          identifier: email,
+          devOtp: process.env.NODE_ENV === 'development' ? otp : undefined
+        });
+      }
+
+      if (isPhone && mobile) {
+        // Mobile registration
+        console.log('📱 Mobile registration, sending OTP to:', mobile);
+
+        // Check if Twilio is configured
+        const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+        const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioVerifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+        const useTwilio = twilioAccountSid && twilioAuthToken && twilioVerifyServiceSid;
+
+        // Generate OTP for database storage (fallback or primary)
+        const otp = generateMobileOTP();
+        const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
+
+        if (useTwilio) {
+          try {
+            console.log('📞 Sending SMS via Twilio to:', mobile);
+            const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+
+            const verification = await twilioClient.verify.v2
+              .services(twilioVerifyServiceSid)
+              .verifications.create({
+                to: mobile,
+                channel: 'sms'
+              });
+
+            console.log('✅ Twilio SMS sent successfully:', verification.status);
+
+            // Store in database as backup
+            await SupabaseMobileOTPStore.set(mobile, {
+              user_id: null,
+              mobile,
+              otp,
+              expires_at: expiresAt,
+              verified: false
+            });
+
+            return NextResponse.json({
+              success: true,
+              message: 'Verification code sent to your mobile number',
+              type: 'sms',
+              identifier: mobile,
+              smsStatus: 'sent'
+            });
+          } catch (twilioError: any) {
+            console.error('❌ Twilio SMS error:', twilioError);
+            // Fall through to database OTP
+          }
+        }
+
+        // Database OTP (fallback or primary if no Twilio)
+        await SupabaseMobileOTPStore.set(mobile, {
+          user_id: null,
+          mobile,
+          otp,
+          expires_at: expiresAt,
+          verified: false
+        });
+
+        console.log('📱 Database OTP generated:', otp);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Verification code generated',
+          type: 'sms',
+          identifier: mobile,
+          devOtp: otp,
+          smsStatus: useTwilio ? 'fallback' : 'database'
+        });
+      }
+    }
+
+    // EXISTING LOGIN FLOW
     if (!emailOrPhone || typeof emailOrPhone !== 'string') {
       return NextResponse.json(
         { error: 'Email or phone number is required' },
@@ -138,6 +296,7 @@ export async function POST(request: NextRequest) {
           const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
           await SupabaseMobileOTPStore.set(userPhone, {
+            user_id: user?.id || null,
             mobile: userPhone,
             otp,
             expires_at: expiresAt,
@@ -164,6 +323,7 @@ export async function POST(request: NextRequest) {
         const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
         await SupabaseMobileOTPStore.set(userPhone, {
+          user_id: user?.id || null,
           mobile: userPhone,
           otp,
           expires_at: expiresAt,
@@ -205,6 +365,7 @@ export async function POST(request: NextRequest) {
 
       // Store OTP in Supabase
       const stored = await SupabaseEmailOTPStore.set(userEmail, {
+        user_id: user?.id || null,
         email: userEmail,
         otp,
         expires_at: expiresAt,

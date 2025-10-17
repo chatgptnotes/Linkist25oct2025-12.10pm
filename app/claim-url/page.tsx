@@ -6,6 +6,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import PersonIcon from '@mui/icons-material/Person';
 import Logo from '@/components/Logo';
+import { Toaster, toast } from 'sonner';
 
 const CheckCircle = CheckCircleIcon;
 const Info = InfoIcon;
@@ -179,23 +180,32 @@ export default function ClaimURLPage() {
         localStorage.setItem('claimedUsername', username);
         localStorage.setItem('profileUrl', data.profileUrl);
 
-        // Show success message with full URL
-        alert(`Success! Your profile is now available at:\n${data.profileUrl}`);
+        // Show success toast with full URL
+        toast.success('Success! Your profile is now available', {
+          description: data.profileUrl,
+          duration: 5000,
+        });
 
-        // Redirect to profile builder
-        router.push('/profiles/builder');
+        // Redirect to profile builder after a short delay
+        setTimeout(() => {
+          router.push('/profiles/builder');
+        }, 1500);
       } else {
         const data = await response.json();
         setErrorMessage(data.error || 'Failed to save username');
+        toast.error(data.error || 'Failed to save username');
       }
     } catch (error) {
       console.error('Error saving username:', error);
       setErrorMessage('Failed to save username. Please try again.');
+      toast.error('Failed to save username. Please try again.');
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <Toaster position="top-center" richColors />
+
       {/* Simple Logo-only Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
