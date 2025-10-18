@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
     console.log('📝 Registration attempt:', { firstName, lastName, email, phone });
 
     // Validate required fields
-    if (!email || !password) {
+    if (!email) {
       return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
+        { success: false, error: 'Email is required' },
         { status: 400 }
       );
     }
@@ -36,12 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json(
-        { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400 }
-      );
-    }
+    // Password is optional (system uses OTP-based authentication)
 
     const normalizedEmail = email.toLowerCase();
 
@@ -62,32 +57,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password with bcrypt (only if password is provided)
-    let hashedPassword = null;
-    if (password) {
-      const saltRounds = 10;
-      hashedPassword = await bcrypt.hash(password, saltRounds);
-    }
-
-    // Insert new user (password_hash is optional for OTP-based authentication)
-    const userInsertData: any = {
-      email: normalizedEmail,
-      first_name: firstName,
-      last_name: lastName,
-      phone_number: phone || null,
-      role: 'user',
-      email_verified: false,
-      mobile_verified: false,
-    };
-
-    // Only include password_hash if it exists (column might not exist in schema)
-    if (hashedPassword) {
-      userInsertData.password_hash = hashedPassword;
-    }
-
+    // Insert new user (no password_hash - system uses OTP-based authentication)
     const { data: newUser, error: insertError } = await supabase
       .from('users')
-      .insert(userInsertData)
+      .insert({
+        email: normalizedEmail,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phone || null,
+        role: 'user',
+        email_verified: false,
+        mobile_verified: false,
+      })
       .select()
       .single();
 

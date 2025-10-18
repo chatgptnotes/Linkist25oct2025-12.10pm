@@ -204,10 +204,7 @@ export default function WelcomeToLinkist() {
         return;
       }
 
-      // Generate a temporary password (user can change later)
-      const tempPassword = `Temp${Date.now()}!`;
-
-      // Step 1: Register new user
+      // Step 1: Register new user (no password - OTP-based authentication)
       const registerResponse = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -218,7 +215,6 @@ export default function WelcomeToLinkist() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: fullMobile,
-          password: tempPassword,
         }),
       });
 
