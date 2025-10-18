@@ -2,6 +2,50 @@
 
 This directory contains SQL migration files for setting up the Linkist NFC database schema.
 
+## 🆕 Latest Migration: Auto-Create Profile System
+
+### Problem Solved
+- **Before**: `profiles.user_id` was NULL after user registration
+- **After**: Profile automatically created with correct `user_id` foreign key link
+
+### New Migration Files
+
+#### 1. `fix-existing-null-user-ids.sql` ⚠️ RUN FIRST
+**Purpose**: Fix existing profiles with NULL user_id
+**What it does**:
+- Creates profiles for users without profiles
+- Links orphaned profiles to users via email match
+- Reports any remaining orphaned profiles
+
+**Run**: Copy and paste in Supabase SQL Editor
+
+#### 2. `auto-create-profile-trigger.sql` ✅ RUN SECOND
+**Purpose**: Automatic profile creation for future registrations
+**What it does**:
+- Creates PostgreSQL trigger on `users` table
+- Auto-creates profile entry when user registers
+- Sets `user_id` foreign key automatically
+
+**Run**: Copy and paste in Supabase SQL Editor after fix script
+
+### Quick Start
+```sql
+-- Step 1: Fix existing data
+\i fix-existing-null-user-ids.sql
+
+-- Step 2: Enable auto-creation
+\i auto-create-profile-trigger.sql
+
+-- Step 3: Verify
+SELECT
+  COUNT(*) FILTER (WHERE user_id IS NOT NULL) as with_user_id,
+  COUNT(*) FILTER (WHERE user_id IS NULL) as without_user_id
+FROM profiles;
+-- Should show 0 for without_user_id
+```
+
+---
+
 ## Migrations
 
 ### 003_create_users_table.sql

@@ -274,8 +274,7 @@ export const SupabaseUserStore = {
     const { data, error } = await supabase
       .from('profiles')
       .insert({
-        id: userId, // Use user ID as profile ID for easy linking
-        user_id: userId,
+        user_id: userId, // Foreign key to users table
         email: profileData.email,
         first_name: profileData.first_name || null,
         last_name: profileData.last_name || null,

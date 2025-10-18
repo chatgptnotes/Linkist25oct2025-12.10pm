@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-middleware'
 import { createClient } from '@supabase/supabase-js'
+import { linkProfileToUser } from '@/lib/profile-users-helpers'
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -27,12 +28,14 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 Fetching profiles for user_id:', userId)
 
-    // Fetch profiles from Supabase using user_id
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('*')
+    // Fetch profiles via profile_users junction table
+    const { data: result, error } = await supabase
+      .from('profile_users')
+      .select(`
+        profile_id,
+        profiles (*)
+      `)
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Supabase fetch error:', error)
@@ -42,9 +45,14 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
+    // Extract profiles from junction table results
+    const profiles = result?.map(item => item.profiles).filter(Boolean) || []
+
+    console.log('✅ Found', profiles.length, 'profile(s) for user')
+
     return NextResponse.json({
       success: true,
-      profiles: profiles || []
+      profiles: profiles
     })
   } catch (error) {
     console.error('Error fetching profiles:', error)
@@ -121,6 +129,15 @@ export async function POST(request: NextRequest) {
         error: 'Failed to save profile to database',
         details: error.message
       }, { status: 500 })
+    }
+
+    // Link profile to user via profile_users junction table
+    try {
+      await linkProfileToUser(profileId, userId)
+      console.log('✅ Profile linked to user via profile_users')
+    } catch (linkError) {
+      console.error('⚠️ Profile linking failed (may already be linked):', linkError)
+      // Non-critical - trigger might have already linked it
     }
 
     return NextResponse.json({

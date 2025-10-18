@@ -657,15 +657,6 @@ export default function HomePage() {
       <Footer />
 
       {/* Mobile Sticky CTA */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#0F0F12]/95 backdrop-blur-sm border-t border-[#2C2C32] z-50">
-        <Link
-          href="/choose-plan"
-          className="block w-full py-3 bg-[#E02424] text-white rounded-full font-medium text-center hover:bg-[#C01E1E] transition-all"
-          style={{ backgroundColor: '#E02424', color: '#FFFFFF' }}
-        >
-          Join Now
-        </Link>
-      </div>
     </div>
   );
 }

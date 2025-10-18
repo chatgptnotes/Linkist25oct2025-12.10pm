@@ -8,6 +8,7 @@ import LanguageIcon from '@mui/icons-material/Language';
 const Globe = LanguageIcon;
 import { useToast } from '@/components/ToastProvider';
 import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar';
 
 export default function WelcomeToLinkist() {
   const router = useRouter();
@@ -25,6 +26,9 @@ export default function WelcomeToLinkist() {
   });
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mobileError, setMobileError] = useState<string>('');
+  const [emailError, setEmailError] = useState<string>('');
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [checkingMobile, setCheckingMobile] = useState(false);
 
   useEffect(() => {
     // Auto-detect country based on IP
@@ -88,6 +92,67 @@ export default function WelcomeToLinkist() {
     checkAuth();
   }, []);
 
+  // Check if email already exists
+  const checkEmailExists = async (email: string) => {
+    if (!email || !email.includes('@')) return;
+
+    setCheckingEmail(true);
+    try {
+      const response = await fetch('/api/auth/check-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.exists) {
+          setEmailError('This email is already registered. Please login instead.');
+          showToast('This email is already registered. Please login.', 'error');
+        } else {
+          setEmailError('');
+        }
+      }
+    } catch (error) {
+      console.error('Email check error:', error);
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
+  // Check if mobile number already exists
+  const checkMobileExists = async (mobile: string) => {
+    if (!mobile || mobile.length < 8) return;
+
+    setCheckingMobile(true);
+    try {
+      const fullMobile = `${formData.countryCode}${mobile.replace(/\s/g, '')}`;
+      const response = await fetch('/api/auth/check-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: fullMobile })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.exists) {
+          setMobileError('This mobile number is already registered. Please login instead.');
+          showToast('This mobile number is already registered. Please login.', 'error');
+        } else {
+          // Only clear if no validation error
+          const validationError = validateMobileNumber(mobile, formData.country);
+          if (!validationError) {
+            setMobileError('');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Mobile check error:', error);
+    } finally {
+      setCheckingMobile(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -103,8 +168,34 @@ export default function WelcomeToLinkist() {
     setLoading(true);
 
     try {
-      // Save user profile data
-      const response = await fetch('/api/user/profile', {
+      const fullMobile = `${formData.countryCode}${formData.mobileNumber.replace(/\s/g, '')}`;
+
+      // Check if user already exists
+      const checkResponse = await fetch('/api/auth/check-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+
+      const checkData = await checkResponse.json();
+
+      if (checkData.exists) {
+        // User already exists - ask them to login
+        showToast('This email is already registered. Please login instead.', 'error');
+        setLoading(false);
+
+        // Optionally redirect to login page
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+        return;
+      }
+
+      // Generate a temporary password (user can change later)
+      const tempPassword = `Temp${Date.now()}!`;
+
+      // Step 1: Register new user
+      const registerResponse = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,15 +204,32 @@ export default function WelcomeToLinkist() {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          country: formData.country,
-          countryCode: formData.countryCode,
-          mobile: `${formData.countryCode}${formData.mobileNumber}`,
-          onboarded: true
+          phone: fullMobile,
+          password: tempPassword,
         }),
       });
 
-      if (response.ok) {
-        showToast('Profile saved successfully!', 'success');
+      if (!registerResponse.ok) {
+        const registerData = await registerResponse.json();
+        showToast(registerData.error || 'Failed to create account. Please try again.', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Login the user automatically
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: tempPassword,
+        }),
+      });
+
+      if (loginResponse.ok) {
+        showToast('Welcome! Your account has been created.', 'success');
 
         // Mark as onboarded
         localStorage.setItem('userOnboarded', 'true');
@@ -132,18 +240,17 @@ export default function WelcomeToLinkist() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           country: formData.country,
-          mobile: `${formData.countryCode}${formData.mobileNumber}`
+          mobile: fullMobile
         }));
 
         // Redirect to mobile verification with phone number
-        const fullPhone = `${formData.countryCode}${formData.mobileNumber}`;
-        router.push(`/verify-mobile?phone=${encodeURIComponent(fullPhone)}`);
+        router.push(`/verify-mobile?phone=${encodeURIComponent(fullMobile)}`);
       } else {
-        const data = await response.json();
-        showToast(data.error || 'Failed to save profile', 'error');
+        const loginData = await loginResponse.json();
+        showToast(loginData.error || 'Login failed', 'error');
       }
     } catch (error) {
-      console.error('Profile save error:', error);
+      console.error('Registration error:', error);
       showToast('An error occurred. Please try again.', 'error');
     } finally {
       setLoading(false);
@@ -236,7 +343,10 @@ export default function WelcomeToLinkist() {
 
   return (
     <>
-      <div className="bg-gray-50 flex items-start justify-center pt-4 md:pt-20 pb-4 px-4">
+      {/* Navbar */}
+      <Navbar />
+
+      <div className="bg-gray-50 flex items-start justify-center pt-20 md:pt-24 pb-4 px-4 min-h-screen">
         <div className="bg-white rounded-none sm:rounded-2xl shadow-xl max-w-3xl w-full p-4 sm:p-6 mb-8">
         {/* Title */}
         <div className="text-center mb-4">
@@ -304,25 +414,42 @@ export default function WelcomeToLinkist() {
                       className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-center"
                     />
                   </div>
-                  <input
-                    type="tel"
-                    placeholder={getMobilePlaceholder()}
-                    value={formData.mobileNumber}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9\s]/g, '');
-                      setFormData({ ...formData, mobileNumber: value });
-                      setMobileError(''); // Clear error on input
-                    }}
-                    pattern="[0-9\s]+"
-                    title="Mobile number should only contain numbers"
-                    className={`flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-                      mobileError ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    required
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="tel"
+                      placeholder={getMobilePlaceholder()}
+                      value={formData.mobileNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9\s]/g, '');
+                        setFormData({ ...formData, mobileNumber: value });
+                        setMobileError(''); // Clear error on input
+                      }}
+                      onBlur={(e) => checkMobileExists(e.target.value)}
+                      pattern="[0-9\s]+"
+                      title="Mobile number should only contain numbers"
+                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                        mobileError ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      required
+                    />
+                    {checkingMobile && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {mobileError && (
-                  <p className="mt-1 text-xs text-red-600">{mobileError}</p>
+                  <div className="mt-1 flex items-start gap-1">
+                    <p className="text-xs text-red-600 flex-1">{mobileError}</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/login')}
+                      className="text-xs text-blue-600 hover:underline font-medium whitespace-nowrap"
+                    >
+                      Login
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -339,11 +466,34 @@ export default function WelcomeToLinkist() {
                     type="email"
                     placeholder="e.g., alex@example.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setEmailError('');
+                    }}
+                    onBlur={(e) => checkEmailExists(e.target.value)}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      emailError ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
+                  {checkingEmail && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                    </div>
+                  )}
                 </div>
+                {emailError && (
+                  <div className="mt-1 flex items-start gap-1">
+                    <p className="text-xs text-red-600 flex-1">{emailError}</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/login')}
+                      className="text-xs text-blue-600 hover:underline font-medium whitespace-nowrap"
+                    >
+                      Login
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* First Name */}
@@ -437,9 +587,9 @@ export default function WelcomeToLinkist() {
             </button>
             <button
               type="submit"
-              disabled={loading || !termsAccepted}
+              disabled={loading || !termsAccepted || !!emailError || !!mobileError}
               className="w-full sm:w-auto px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400 cursor-pointer"
-              style={{ backgroundColor: (loading || !termsAccepted) ? '#9CA3AF' : '#DC2626', color: '#FFFFFF' }}
+              style={{ backgroundColor: (loading || !termsAccepted || emailError || mobileError) ? '#9CA3AF' : '#DC2626', color: '#FFFFFF' }}
             >
               {loading ? (
                 <div className="flex items-center">

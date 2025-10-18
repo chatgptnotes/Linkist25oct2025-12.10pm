@@ -1752,24 +1752,26 @@ function ProfileBuilderContent() {
 
                   {/* Professional Summary */}
                   <div>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <div className="mb-3 sm:mb-4">
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900">Professional Summary</h3>
-                      <span className={`text-sm ${profileData.professionalSummary.length > 500 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                    </div>
+                    <div className="relative">
+                      <textarea
+                        value={profileData.professionalSummary}
+                        onChange={(e) => {
+                          if (e.target.value.length <= 500) {
+                            setProfileData({ ...profileData, professionalSummary: e.target.value });
+                          }
+                        }}
+                        rows={6}
+                        maxLength={500}
+                        className="w-full px-3 py-2 pb-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
+                        placeholder="Experienced Product Manager with 8+ years in tech industry. Specialized in building scalable products and leading cross-functional teams. Passionate about user experience an"
+                      />
+                      <span className={`absolute bottom-2 right-3 text-sm ${profileData.professionalSummary.length > 500 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                         {profileData.professionalSummary.length}/500
                       </span>
                     </div>
-                    <textarea
-                      value={profileData.professionalSummary}
-                      onChange={(e) => {
-                        if (e.target.value.length <= 500) {
-                          setProfileData({ ...profileData, professionalSummary: e.target.value });
-                        }
-                      }}
-                      rows={6}
-                      maxLength={500}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
-                      placeholder="Experienced Product Manager with 8+ years in tech industry. Specialized in building scalable products and leading cross-functional teams. Passionate about user experience an"
-                    />
                     <p className="text-xs text-gray-500 mt-1">Write a brief summary of your professional background and expertise (maximum 500 characters)</p>
                   </div>
                 </div>
@@ -1810,8 +1812,7 @@ function ProfileBuilderContent() {
                 <div className="p-4 sm:p-6 space-y-6">
                   {/* Social Media Accounts */}
                   <div>
-                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                      <span className="text-red-500 text-xl">#</span>
+                    <div className="mb-3 sm:mb-4">
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900">Social Media Accounts</h3>
                     </div>
 
@@ -1956,8 +1957,7 @@ function ProfileBuilderContent() {
 
                   {/* Custom Links & Portfolios */}
                   <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-red-500 text-xl">🔗</span>
+                    <div className="mb-4">
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900">Custom Links & Portfolios</h3>
                     </div>
 
@@ -2127,8 +2127,7 @@ function ProfileBuilderContent() {
                 <div className="p-6 space-y-8">
                   {/* Profile Photo */}
                   <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-red-500 text-xl">📷</span>
+                    <div className="mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">Profile Photo</h3>
                     </div>
 
@@ -2232,8 +2231,7 @@ function ProfileBuilderContent() {
 
                   {/* Background Image */}
                   <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-red-500 text-xl">🖼️</span>
+                    <div className="mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">Background Image</h3>
                     </div>
 
@@ -2282,7 +2280,6 @@ function ProfileBuilderContent() {
                           ) : (
                             <div className="flex items-center justify-center h-full p-8">
                               <div className="text-center text-gray-600">
-                                <p className="font-medium mb-4">Current Background</p>
                                 <input
                                   type="file"
                                   id="background-image-upload"

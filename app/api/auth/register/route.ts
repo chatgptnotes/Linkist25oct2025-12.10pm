@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import { rateLimitMiddleware, RateLimits } from '@/lib/rate-limit';
+import { SupabaseUserStore } from '@/lib/supabase-user-store';
+import { linkProfileToUser } from '@/lib/profile-users-helpers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -89,6 +91,31 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ User registered successfully:', normalizedEmail);
+
+    // Create profile for the new user and link via profile_users
+    try {
+      console.log('📝 Creating profile for user:', newUser.id);
+      const profile = await SupabaseUserStore.createOrUpdateProfile(newUser.id, {
+        email: normalizedEmail,
+        first_name: firstName,
+        last_name: lastName,
+        phone: phone || null,
+      });
+      console.log('✅ Profile created successfully:', profile.id);
+
+      // Link profile to user via profile_users junction table
+      try {
+        await linkProfileToUser(profile.id, newUser.id);
+        console.log('✅ Profile linked to user via profile_users');
+      } catch (linkError) {
+        console.error('⚠️ Profile linking failed (may already be linked):', linkError);
+        // Non-critical - trigger might have already linked it
+      }
+    } catch (profileError) {
+      console.error('⚠️ Profile creation failed (non-critical):', profileError);
+      // Don't fail registration if profile creation fails
+      // User can still login and profile will be created later
+    }
 
     // Return success with user data
     return NextResponse.json({

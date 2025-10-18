@@ -57,16 +57,23 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     // Check authentication status
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store'
+        });
+
         if (response.ok) {
           const data = await response.json();
           setUserData(data.user);
         } else if (response.status === 401) {
-          // User not authenticated - this is expected
+          // User not authenticated - this is expected, not an error
+          setUserData(null);
+        } else {
+          // Other errors
           setUserData(null);
         }
       } catch (error) {
-        // Silently handle errors - 401 is expected when not logged in
+        // Network or other errors - silently handle
         setUserData(null);
       }
     };

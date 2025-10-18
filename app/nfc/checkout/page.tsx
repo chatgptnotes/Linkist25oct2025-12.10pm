@@ -48,6 +48,15 @@ const checkoutSchema = z.object({
   country: z.string().min(1, 'Country is required'),
   quantity: z.number().min(1).max(10),
   isFounderMember: z.boolean(),
+}).superRefine((data, ctx) => {
+  // Make postal code mandatory only for India
+  if (data.country === 'IN' && (!data.postalCode || data.postalCode.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Postal code is required for India',
+      path: ['postalCode'],
+    });
+  }
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
@@ -700,7 +709,7 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Postal Code *
+                        Postal Code {watchedValues.country === 'IN' && '*'}
                       </label>
                       <input
                         {...register('postalCode')}
@@ -709,6 +718,9 @@ export default function CheckoutPage() {
                       />
                       {errors.postalCode && (
                         <p className="text-red-500 text-sm mt-1">{errors.postalCode.message}</p>
+                      )}
+                      {watchedValues.country === 'IN' && !errors.postalCode && (
+                        <p className="text-xs text-gray-500 mt-1">Mandatory field for users in India</p>
                       )}
                     </div>
                     <div>
