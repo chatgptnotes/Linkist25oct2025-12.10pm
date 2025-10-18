@@ -62,23 +62,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password with bcrypt
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // Hash password with bcrypt (only if password is provided)
+    let hashedPassword = null;
+    if (password) {
+      const saltRounds = 10;
+      hashedPassword = await bcrypt.hash(password, saltRounds);
+    }
 
-    // Insert new user
+    // Insert new user (password_hash is optional for OTP-based authentication)
+    const userInsertData: any = {
+      email: normalizedEmail,
+      first_name: firstName,
+      last_name: lastName,
+      phone_number: phone || null,
+      role: 'user',
+      email_verified: false,
+      mobile_verified: false,
+    };
+
+    // Only include password_hash if it exists (column might not exist in schema)
+    if (hashedPassword) {
+      userInsertData.password_hash = hashedPassword;
+    }
+
     const { data: newUser, error: insertError } = await supabase
       .from('users')
-      .insert({
-        email: normalizedEmail,
-        first_name: firstName,
-        last_name: lastName,
-        phone_number: phone || null,
-        password_hash: hashedPassword,
-        role: 'user',
-        email_verified: false,
-        mobile_verified: false,
-      })
+      .insert(userInsertData)
       .select()
       .single();
 
