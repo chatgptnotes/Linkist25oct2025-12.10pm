@@ -17,7 +17,16 @@ export default function Navbar() {
     // Check if user is logged in
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store'
+        }).catch(() => null); // Suppress fetch errors in console
+
+        if (!response) {
+          setIsLoggedIn(false);
+          return;
+        }
+
         if (response.ok) {
           const data = await response.json();
           setIsLoggedIn(data.isAuthenticated);
@@ -28,6 +37,9 @@ export default function Navbar() {
               lastName: data.user.last_name,
             });
           }
+        } else {
+          // 401 is expected when not logged in
+          setIsLoggedIn(false);
         }
       } catch (error) {
         setIsLoggedIn(false);

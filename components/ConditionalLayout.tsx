@@ -62,16 +62,18 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
         const response = await fetch('/api/auth/me', {
           credentials: 'include',
           cache: 'no-store'
-        });
+        }).catch(() => null); // Suppress fetch errors in console
+
+        if (!response) {
+          setUserData(null);
+          return;
+        }
 
         if (response.ok) {
           const data = await response.json();
           setUserData(data.user);
-        } else if (response.status === 401) {
-          // User not authenticated - this is expected, not an error
-          setUserData(null);
         } else {
-          // Other errors
+          // 401 is expected when not logged in - silently handle
           setUserData(null);
         }
       } catch (error) {
