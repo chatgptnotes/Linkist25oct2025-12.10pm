@@ -229,20 +229,19 @@ export default function WelcomeToLinkist() {
         return;
       }
 
-      // Step 2: Login the user automatically
-      const loginResponse = await fetch('/api/auth/login', {
+      // Step 2: Send OTP to user's mobile for verification
+      const otpResponse = await fetch('/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: formData.email,
-          password: tempPassword,
+          emailOrPhone: fullMobile, // Send OTP to mobile number
         }),
       });
 
-      if (loginResponse.ok) {
-        showToast('Welcome! Your account has been created.', 'success');
+      if (otpResponse.ok) {
+        showToast('Verification code sent to your mobile!', 'success');
 
         // Mark as onboarded
         localStorage.setItem('userOnboarded', 'true');
@@ -256,11 +255,15 @@ export default function WelcomeToLinkist() {
           mobile: fullMobile
         }));
 
+        // Store login identifier for OTP verification
+        localStorage.setItem('loginIdentifier', fullMobile);
+
         // Redirect to mobile verification with phone number
         router.push(`/verify-mobile?phone=${encodeURIComponent(fullMobile)}`);
       } else {
-        const loginData = await loginResponse.json();
-        showToast(loginData.error || 'Login failed', 'error');
+        const otpData = await otpResponse.json();
+        showToast(otpData.error || 'Failed to send verification code', 'error');
+        setLoading(false);
       }
     } catch (error) {
       console.error('Registration error:', error);
