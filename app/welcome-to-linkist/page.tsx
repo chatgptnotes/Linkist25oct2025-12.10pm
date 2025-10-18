@@ -156,6 +156,12 @@ export default function WelcomeToLinkist() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Check if there are any existing errors
+    if (emailError || mobileError) {
+      showToast('Please fix the errors before continuing.', 'error');
+      return;
+    }
+
     // Validate mobile number
     const validationError = validateMobileNumber(formData.mobileNumber, formData.country);
     if (validationError) {
@@ -170,24 +176,31 @@ export default function WelcomeToLinkist() {
     try {
       const fullMobile = `${formData.countryCode}${formData.mobileNumber.replace(/\s/g, '')}`;
 
-      // Check if user already exists
+      // Double-check if user already exists (in case onBlur didn't trigger)
       const checkResponse = await fetch('/api/auth/check-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email })
+        body: JSON.stringify({ email: formData.email, mobile: fullMobile })
       });
+
+      if (!checkResponse.ok) {
+        showToast('Failed to verify user information. Please try again.', 'error');
+        setLoading(false);
+        return;
+      }
 
       const checkData = await checkResponse.json();
 
       if (checkData.exists) {
         // User already exists - ask them to login
+        setEmailError('This email is already registered. Please login instead.');
         showToast('This email is already registered. Please login instead.', 'error');
         setLoading(false);
 
         // Optionally redirect to login page
         setTimeout(() => {
           router.push('/login');
-        }, 2000);
+        }, 2500);
         return;
       }
 
