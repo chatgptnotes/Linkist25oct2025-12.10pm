@@ -313,7 +313,7 @@ export default function MapPickerSimple({ initialAddress, onAddressChange, class
     setLocationError(''); // Clear previous errors
 
     try {
-      let enhancedQuery = searchQuery.trim();
+      const enhancedQuery = searchQuery.trim();
 
       // Try multiple search strategies
       const searchStrategies = [
@@ -456,7 +456,7 @@ export default function MapPickerSimple({ initialAddress, onAddressChange, class
                 {locationError.split('\n').map((line, index) => {
                   // Style different line types
                   let className = '';
-                  let content = line;
+                  const content = line;
 
                   if (line.startsWith('📱')) {
                     className = 'font-semibold text-red-700 mt-3 mb-1';

@@ -102,10 +102,10 @@ class App {
   }
 
   initCards(px: number, py: number, pz: number, name: string, reversed: boolean) {
-    var radius = 6;
-    var width = 140,
+    const radius = 6;
+    const width = 140,
       height = 100;
-    var geometry = new window.THREE.BoxGeometry(width, height, 1, 100, 50, 10);
+    const geometry = new window.THREE.BoxGeometry(width, height, 1, 100, 50, 10);
 
     let textureFront = new window.THREE.TextureLoader().load("/card_linkist_black_png.png");
     let textureBack = new window.THREE.TextureLoader().load("/linkist_Card_Mockup.png");
@@ -117,7 +117,7 @@ class App {
 
     textureFront.anisotropy = textureBack.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
-    let cardMaterialArray = [];
+    const cardMaterialArray = [];
 
     cardMaterialArray.push(
       new window.THREE.MeshPhongMaterial({
@@ -164,10 +164,10 @@ class App {
 
     // For newer Three.js versions, we need to work with BufferGeometry
     if (geometry.attributes && geometry.attributes.position) {
-      let v1 = new window.THREE.Vector3();
-      let w1 = (width - radius * 2) * 0.5,
+      const v1 = new window.THREE.Vector3();
+      const w1 = (width - radius * 2) * 0.5,
         h1 = (height - radius * 2) * 0.5;
-      let vTemp = new window.THREE.Vector3(),
+      const vTemp = new window.THREE.Vector3(),
         vSign = new window.THREE.Vector3(),
         vRad = new window.THREE.Vector3();
       
@@ -193,7 +193,7 @@ class App {
       geometry.attributes.position.needsUpdate = true;
     }
 
-    let cube = new window.THREE.Mesh(geometry, cardMaterialArray);
+    const cube = new window.THREE.Mesh(geometry, cardMaterialArray);
     cube.position.set(px, py, pz);
     cube.name = name;
     this.scene.add(cube);
@@ -212,7 +212,7 @@ class App {
   }
 
   animationTimeline1(element: any) {
-    let tl = new window.TimelineMax({
+    const tl = new window.TimelineMax({
       delay: 1.5,
       repeat: -1
     });
@@ -239,7 +239,7 @@ class App {
   }
 
   animationTimeline2(element: any) {
-    let tl = new window.TimelineMax({
+    const tl = new window.TimelineMax({
       delay: 1.5,
       repeat: -1
     });

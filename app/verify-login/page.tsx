@@ -152,9 +152,9 @@ export default function VerifyLoginPage() {
         // Show success state
         setSuccess(true);
 
-        // Redirect to profile dashboard to show user's orders
+        // Redirect existing users to e-commerce journey instead of profile dashboard
         setTimeout(() => {
-          window.location.href = '/profile-dashboard';
+          window.location.href = '/product-selection';
         }, 2000);
       } else {
         showToast(data.error || 'Invalid verification code', 'error');

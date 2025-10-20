@@ -42,13 +42,19 @@ export async function POST(request: NextRequest) {
         const otp = generateEmailOTP();
         const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
-        // Store OTP in Supabase (without user_id for new registration)
+        // Store OTP in Supabase with registration data for new users
         const stored = await SupabaseEmailOTPStore.set(email, {
           user_id: null,
           email,
           otp,
           expires_at: expiresAt,
-          verified: false
+          verified: false,
+          user_data: {
+            firstName,
+            lastName,
+            email,
+            phone: null
+          }
         });
 
         if (!stored) {
@@ -122,13 +128,19 @@ export async function POST(request: NextRequest) {
 
             console.log('✅ Twilio SMS sent successfully:', verification.status);
 
-            // Store in database as backup
+            // Store in database as backup with registration data
             await SupabaseMobileOTPStore.set(mobile, {
               user_id: null,
               mobile,
               otp,
               expires_at: expiresAt,
-              verified: false
+              verified: false,
+              user_data: {
+                firstName,
+                lastName,
+                email: null,
+                phone: mobile
+              }
             });
 
             return NextResponse.json({
@@ -144,13 +156,19 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Database OTP (fallback or primary if no Twilio)
+        // Database OTP (fallback or primary if no Twilio) with registration data
         await SupabaseMobileOTPStore.set(mobile, {
           user_id: null,
           mobile,
           otp,
           expires_at: expiresAt,
-          verified: false
+          verified: false,
+          user_data: {
+            firstName,
+            lastName,
+            email: null,
+            phone: mobile
+          }
         });
 
         console.log('📱 Database OTP generated:', otp);
@@ -198,7 +216,7 @@ export async function POST(request: NextRequest) {
       userEmail = emailOrPhone;
     } else if (isPhone) {
       // Clean phone number (remove spaces, dashes, parentheses)
-      let cleanPhone = emailOrPhone.replace(/[\s-()]/g, '');
+      const cleanPhone = emailOrPhone.replace(/[\s-()]/g, '');
 
       // Try multiple phone number formats
       const phoneVariants = [

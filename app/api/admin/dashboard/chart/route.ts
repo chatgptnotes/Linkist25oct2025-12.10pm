@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     
     // Calculate date range and intervals
     const now = new Date();
-    let startDate = new Date();
-    let intervals: { name: string; start: Date; end: Date }[] = [];
+    const startDate = new Date();
+    const intervals: { name: string; start: Date; end: Date }[] = [];
     
     switch (range) {
       case '7days':

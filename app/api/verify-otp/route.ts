@@ -168,11 +168,41 @@ export async function POST(request: NextRequest) {
       }
 
       if (!user) {
-        console.error('❌ [verify-otp] User not found for any phone format. Tried:', phoneFormats);
-        return NextResponse.json(
-          { error: 'User account not found. Please register first.' },
-          { status: 404 }
-        );
+        console.log('👤 [verify-otp] User not found, checking if this is new registration for mobile:', identifier);
+
+        // Get the stored OTP record to check for user registration data
+        const mobileRecord = await SupabaseMobileOTPStore.get(identifier);
+
+        if (mobileRecord && mobileRecord.user_data) {
+          console.log('🆕 [verify-otp] Creating new user account for mobile:', identifier);
+
+          try {
+            // Create the user account now that OTP is verified
+            user = await SupabaseUserStore.upsertByEmail({
+              email: mobileRecord.user_data.email || `${Date.now()}@temp-mobile-user.com`, // Temporary email if not provided
+              first_name: mobileRecord.user_data.firstName,
+              last_name: mobileRecord.user_data.lastName,
+              phone_number: identifier,
+              role: 'user',
+              email_verified: false,
+              mobile_verified: true,
+            });
+
+            console.log('✅ [verify-otp] New user created successfully with mobile:', user.id);
+          } catch (createError) {
+            console.error('❌ [verify-otp] Failed to create user for mobile:', createError);
+            return NextResponse.json(
+              { error: 'Failed to create user account. Please try again.' },
+              { status: 500 }
+            );
+          }
+        } else {
+          console.error('❌ [verify-otp] User not found for any phone format and no registration data. Tried:', phoneFormats);
+          return NextResponse.json(
+            { error: 'User account not found. Please register first.' },
+            { status: 404 }
+          );
+        }
       }
 
       // Update mobile verification status
@@ -214,15 +244,43 @@ export async function POST(request: NextRequest) {
         verified: true
       });
 
-      // Get user from database
+      // Get user from database or create if this is a new registration
       user = await SupabaseUserStore.getByEmail(identifier);
 
       if (!user) {
-        console.error('❌ [verify-otp] User not found for email:', identifier);
-        return NextResponse.json(
-          { error: 'User account not found. Please register first.' },
-          { status: 404 }
-        );
+        console.log('👤 [verify-otp] User not found, checking if this is new registration for:', identifier);
+
+        // Check if this OTP record has user registration data
+        if (storedRecord.user_data) {
+          console.log('🆕 [verify-otp] Creating new user account for:', identifier);
+
+          try {
+            // Create the user account now that OTP is verified
+            user = await SupabaseUserStore.upsertByEmail({
+              email: identifier,
+              first_name: storedRecord.user_data.firstName,
+              last_name: storedRecord.user_data.lastName,
+              phone_number: storedRecord.user_data.phone || null,
+              role: 'user',
+              email_verified: true,
+              mobile_verified: false,
+            });
+
+            console.log('✅ [verify-otp] New user created successfully:', user.id);
+          } catch (createError) {
+            console.error('❌ [verify-otp] Failed to create user:', createError);
+            return NextResponse.json(
+              { error: 'Failed to create user account. Please try again.' },
+              { status: 500 }
+            );
+          }
+        } else {
+          console.error('❌ [verify-otp] User not found and no registration data available for:', identifier);
+          return NextResponse.json(
+            { error: 'User account not found. Please register first.' },
+            { status: 404 }
+          );
+        }
       }
 
       // Update email verification status
