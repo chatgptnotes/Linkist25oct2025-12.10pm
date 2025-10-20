@@ -1,6 +1,8 @@
 import { type NextRequest } from 'next/server'
 import { authMiddleware } from '@/lib/auth-middleware'
 
+export const runtime = 'nodejs'
+
 export async function middleware(request: NextRequest) {
   // Use the new authentication middleware
   return await authMiddleware(request)
