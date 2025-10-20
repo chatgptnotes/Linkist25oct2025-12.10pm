@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
 import { SupabaseOrderStore, generateOrderNumber } from '@/lib/supabase-order-store';
 import { SupabaseUserStore } from '@/lib/supabase-user-store';
@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
   let event;
 
   try {
+    // Initialize Stripe only when needed
+    const stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
   } catch (error) {
     console.error('Webhook signature verification failed:', error);

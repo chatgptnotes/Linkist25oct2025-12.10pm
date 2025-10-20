@@ -1,18 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-09-30.acacia',
-});
+// Helper function to get Stripe instance
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+  return new Stripe(secretKey, {
+    apiVersion: '2024-09-30.acacia',
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if Stripe is configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: 'Payment processing not configured' },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json();
     const { amount, currency = 'usd', orderData } = body;
 
     // Convert amount to cents for Stripe
     const amountInCents = Math.round(amount * 100);
+
+    // Initialize Stripe only when needed
+    const stripe = getStripe();
 
     // Create a payment intent
     const paymentIntent = await stripe.paymentIntents.create({

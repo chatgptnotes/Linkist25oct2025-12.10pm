@@ -1,15 +1,25 @@
 import Stripe from 'stripe';
 
-// Allow missing Stripe key during build time
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-if (!stripeSecretKey && process.env.NODE_ENV !== 'production') {
-  console.warn('⚠️ STRIPE_SECRET_KEY not found. Stripe functionality will be disabled.');
+// Helper function to get Stripe instance only when needed
+export function getStripe(): Stripe {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+  if (!stripeSecretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+
+  return new Stripe(stripeSecretKey, {
+    apiVersion: '2024-11-20.acacia',
+    typescript: true,
+  });
 }
 
-export const stripe = new Stripe(stripeSecretKey || 'sk_test_placeholder', {
-  apiVersion: '2024-11-20.acacia',
-  typescript: true,
-});
+// Legacy export - only use when Stripe is definitely configured
+export const stripe = {
+  get instance() {
+    return getStripe();
+  }
+};
 
 export const formatAmountForStripe = (amount: number): number => {
   return Math.round(amount * 100);

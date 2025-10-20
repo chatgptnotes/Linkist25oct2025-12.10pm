@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, formatAmountForStripe, PRODUCT_CONFIG } from '@/lib/stripe';
+import { getStripe, formatAmountForStripe, PRODUCT_CONFIG } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Initialize Stripe only when needed
+    const stripe = getStripe();
 
     // Create PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
