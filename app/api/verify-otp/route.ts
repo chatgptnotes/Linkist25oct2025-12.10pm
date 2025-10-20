@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseEmailOTPStore, SupabaseMobileOTPStore, type EmailOTPRecord } from '@/lib/supabase-otp-store';
 import { SupabaseUserStore } from '@/lib/supabase-user-store';
 import { SessionStore } from '@/lib/session-store';
+import { memoryOTPStore } from '@/lib/memory-otp-store';
 import twilio from 'twilio';
 
 export async function POST(request: NextRequest) {

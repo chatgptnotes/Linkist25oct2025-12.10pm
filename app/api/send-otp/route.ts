@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendOTPEmail } from '@/lib/smtp-email-service';
 import { SupabaseEmailOTPStore, SupabaseMobileOTPStore, generateEmailOTP, generateMobileOTP, cleanExpiredOTPs, type EmailOTPRecord } from '@/lib/supabase-otp-store';
 import { SupabaseUserStore } from '@/lib/supabase-user-store';
+import { memoryOTPStore, generateOTP } from '@/lib/memory-otp-store';
 import twilio from 'twilio';
 
 export async function POST(request: NextRequest) {
@@ -20,8 +21,12 @@ export async function POST(request: NextRequest) {
 
       console.log('🆕 New registration detected for:', identifier);
 
-      // Clean expired OTPs first
-      await cleanExpiredOTPs();
+      // Clean expired OTPs first (fallback to memory store if Supabase fails)
+      try {
+        await cleanExpiredOTPs();
+      } catch (error) {
+        console.warn('⚠️ Supabase cleanup failed, using memory fallback:', error);
+      }
 
       if (isEmail && email) {
         // Email registration
@@ -39,30 +44,44 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate OTP
-        const otp = generateEmailOTP();
-        const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
+        const otp = generateOTP();
+        const expiresAt = Date.now() + (10 * 60 * 1000);
 
-        // Store OTP in Supabase with registration data for new users
-        const stored = await SupabaseEmailOTPStore.set(email, {
-          user_id: null,
-          email,
-          otp,
-          expires_at: expiresAt,
-          verified: false,
-          user_data: {
-            firstName,
-            lastName,
+        // Try to store OTP in Supabase, fallback to memory store
+        let stored = false;
+        try {
+          stored = await SupabaseEmailOTPStore.set(email, {
+            user_id: null,
             email,
-            phone: null
-          }
-        });
+            otp,
+            expires_at: new Date(expiresAt).toISOString(),
+            verified: false,
+            user_data: {
+              firstName,
+              lastName,
+              email,
+              phone: null
+            }
+          });
+        } catch (error) {
+          console.warn('⚠️ Supabase storage failed, using memory fallback:', error);
+        }
 
         if (!stored) {
-          console.error('Failed to store OTP in database');
-          return NextResponse.json(
-            { error: 'Failed to store verification code' },
-            { status: 500 }
-          );
+          // Fallback to memory storage for development
+          console.log('💾 Using memory storage fallback for email OTP');
+          memoryOTPStore.set(email, {
+            otp,
+            expiresAt,
+            type: 'email',
+            userData: {
+              firstName,
+              lastName,
+              email,
+              phone: null
+            }
+          });
+          stored = true;
         }
 
         // Send email OTP
@@ -111,8 +130,8 @@ export async function POST(request: NextRequest) {
         const useTwilio = twilioAccountSid && twilioAuthToken && twilioVerifyServiceSid;
 
         // Generate OTP for database storage (fallback or primary)
-        const otp = generateMobileOTP();
-        const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
+        const otp = generateOTP();
+        const expiresAt = Date.now() + (10 * 60 * 1000);
 
         if (useTwilio) {
           try {
@@ -128,20 +147,35 @@ export async function POST(request: NextRequest) {
 
             console.log('✅ Twilio SMS sent successfully:', verification.status);
 
-            // Store in database as backup with registration data
-            await SupabaseMobileOTPStore.set(mobile, {
-              user_id: null,
-              mobile,
-              otp,
-              expires_at: expiresAt,
-              verified: false,
-              user_data: {
-                firstName,
-                lastName,
-                email: null,
-                phone: mobile
-              }
-            });
+            // Store in database as backup with registration data (with fallback)
+            try {
+              await SupabaseMobileOTPStore.set(mobile, {
+                user_id: null,
+                mobile,
+                otp,
+                expires_at: new Date(expiresAt).toISOString(),
+                verified: false,
+                user_data: {
+                  firstName,
+                  lastName,
+                  email: null,
+                  phone: mobile
+                }
+              });
+            } catch (error) {
+              console.warn('⚠️ Supabase mobile storage failed, using memory fallback:', error);
+              memoryOTPStore.set(mobile, {
+                otp,
+                expiresAt,
+                type: 'phone',
+                userData: {
+                  firstName,
+                  lastName,
+                  email: null,
+                  phone: mobile
+                }
+              });
+            }
 
             return NextResponse.json({
               success: true,
@@ -157,19 +191,34 @@ export async function POST(request: NextRequest) {
         }
 
         // Database OTP (fallback or primary if no Twilio) with registration data
-        await SupabaseMobileOTPStore.set(mobile, {
-          user_id: null,
-          mobile,
-          otp,
-          expires_at: expiresAt,
-          verified: false,
-          user_data: {
-            firstName,
-            lastName,
-            email: null,
-            phone: mobile
-          }
-        });
+        try {
+          await SupabaseMobileOTPStore.set(mobile, {
+            user_id: null,
+            mobile,
+            otp,
+            expires_at: new Date(expiresAt).toISOString(),
+            verified: false,
+            user_data: {
+              firstName,
+              lastName,
+              email: null,
+              phone: mobile
+            }
+          });
+        } catch (error) {
+          console.warn('⚠️ Supabase mobile storage failed, using memory fallback:', error);
+          memoryOTPStore.set(mobile, {
+            otp,
+            expiresAt,
+            type: 'phone',
+            userData: {
+              firstName,
+              lastName,
+              email: null,
+              phone: mobile
+            }
+          });
+        }
 
         console.log('📱 Database OTP generated:', otp);
 

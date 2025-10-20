@@ -53,3 +53,6 @@ TWILIO_NAVIGATION_GUIDE.md
 SMS_ENABLE_KARO.md
 CONSOLE_OTP_GUIDE.md
 check-twilio-config.sh
+
+# Local Netlify folder
+.netlify
