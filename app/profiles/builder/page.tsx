@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
 
 const MapPickerSimple = dynamic(() => import('@/components/MapPickerSimple'), {
   ssr: false,
@@ -228,6 +229,67 @@ const SUB_DOMAINS = [
 // Flatten all sub-domains for searching
 const ALL_SUB_DOMAINS = SUB_DOMAINS.flatMap(group => group.subDomains);
 
+// Helper function to detect country code from phone number
+function detectCountryCodeFromNumber(phoneNumber: string): { countryCode: string; number: string } {
+  if (!phoneNumber) {
+    return { countryCode: '+971', number: '' };
+  }
+
+  // Remove spaces and special characters except +
+  const cleaned = phoneNumber.trim().replace(/[\s-()]/g, '');
+
+  // Common country codes (ordered by length - longest first for proper matching)
+  const countryCodes = [
+    '+880', // Bangladesh (3 digits)
+    '+971', // UAE (3 digits)
+    '+966', // Saudi Arabia (3 digits)
+    '+974', // Qatar (3 digits)
+    '+965', // Kuwait (3 digits)
+    '+968', // Oman (3 digits)
+    '+973', // Bahrain (3 digits)
+    '+91',  // India (2 digits)
+    '+92',  // Pakistan (2 digits)
+    '+94',  // Sri Lanka (2 digits)
+    '+86',  // China (2 digits)
+    '+81',  // Japan (2 digits)
+    '+82',  // South Korea (2 digits)
+    '+44',  // UK (2 digits)
+    '+20',  // Egypt (2 digits)
+    '+1',   // USA/Canada (1 digit)
+  ];
+
+  // First check if number starts with + and a country code
+  for (const code of countryCodes) {
+    if (cleaned.startsWith(code)) {
+      const numberWithoutCode = cleaned.substring(code.length);
+      console.log(`🔍 Country code detected: ${code} from "${phoneNumber}" -> Number: ${numberWithoutCode}`);
+      return { countryCode: code, number: numberWithoutCode };
+    }
+  }
+
+  // If no + prefix, check if number starts with country code digits (without +)
+  // This handles cases like "918999355932" -> should detect "91" as India
+  for (const code of countryCodes) {
+    const codeDigits = code.substring(1); // Remove the + to get just digits
+    if (cleaned.startsWith(codeDigits)) {
+      const numberWithoutCode = cleaned.substring(codeDigits.length);
+      console.log(`🔍 Country code detected: ${code} from "${phoneNumber}" -> Number: ${numberWithoutCode}`);
+      return { countryCode: code, number: numberWithoutCode };
+    }
+  }
+
+  // Special handling for Indian mobile numbers (they start with 6-9 and are 10 digits)
+  // If number starts with 6, 7, 8, or 9 and is 10 digits, it's likely an Indian number
+  if (/^[6-9]\d{9}$/.test(cleaned)) {
+    console.log(`🇮🇳 Detected Indian mobile number pattern in "${phoneNumber}"`);
+    return { countryCode: '+91', number: cleaned };
+  }
+
+  // If no country code detected, assume +971 and return full number
+  console.log(`⚠️ No country code detected in "${phoneNumber}", defaulting to +971`);
+  return { countryCode: '+971', number: cleaned.startsWith('+') ? cleaned.substring(1) : cleaned };
+}
+
 function ProfileBuilderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -236,7 +298,7 @@ function ProfileBuilderContent() {
   const [activeSection, setActiveSection] = useState<'basic' | 'professional' | 'social' | 'media-photo' | 'media-gallery'>('basic');
   const [skillInput, setSkillInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toastState, setToastState] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [mobileCountryCode, setMobileCountryCode] = useState('+971');
   const [whatsappCountryCode, setWhatsappCountryCode] = useState('+971');
   const [useSameNumberForWhatsapp, setUseSameNumberForWhatsapp] = useState(false);
@@ -459,14 +521,28 @@ function ProfileBuilderContent() {
                 socialLinks = profileToEdit.social_links;
               }
 
+              // Auto-detect country codes from phone numbers and split them
+              console.log('📱 Raw phone_number from database:', profileToEdit.phone_number);
+              console.log('📱 Raw whatsapp from database:', profileToEdit.whatsapp);
+
+              const mobileDetected = detectCountryCodeFromNumber(profileToEdit.phone_number || '');
+              const whatsappDetected = detectCountryCodeFromNumber(profileToEdit.whatsapp || '');
+
+              console.log('📞 Mobile detected - Code:', mobileDetected.countryCode, 'Number:', mobileDetected.number);
+              console.log('📞 WhatsApp detected - Code:', whatsappDetected.countryCode, 'Number:', whatsappDetected.number);
+
+              // Set country code dropdowns
+              setMobileCountryCode(mobileDetected.countryCode);
+              setWhatsappCountryCode(whatsappDetected.countryCode);
+
               // Map database profile structure to builder structure
               const mappedProfile = {
                 firstName: profileToEdit.first_name || '',
                 lastName: profileToEdit.last_name || '',
                 primaryEmail: profileToEdit.email || '',
                 secondaryEmail: profileToEdit.alternate_email || '',
-                mobileNumber: profileToEdit.phone_number || '',
-                whatsappNumber: profileToEdit.whatsapp || '',
+                mobileNumber: mobileDetected.number,
+                whatsappNumber: whatsappDetected.number,
                 showEmailPublicly: profileToEdit.show_email_publicly ?? true,
                 showMobilePublicly: profileToEdit.show_mobile_publicly ?? true,
                 showWhatsappPublicly: profileToEdit.show_whatsapp_publicly ?? false,
@@ -524,7 +600,10 @@ function ProfileBuilderContent() {
               };
 
               setProfileData(mappedProfile);
-              console.log('✅ Profile data loaded from database');
+
+              console.log('✅ Profile data loaded from database with auto-detection');
+              console.log('📱 Mobile Number (split):', mappedProfile.mobileNumber);
+              console.log('📱 WhatsApp Number (split):', mappedProfile.whatsappNumber);
               console.log('🏢 Mapped Company Logo:', mappedProfile.companyLogo);
               return; // Exit early, we have the data
             }
@@ -596,48 +675,26 @@ function ProfileBuilderContent() {
 
         // Apply merged data to profile
         if (Object.keys(mergedData).length > 0) {
-          // Parse phone number to detect and remove country code if present
-          let cleanedPhoneNumber = mergedData.mobileNumber || '';
-          let detectedCountryCode = '+971'; // Default to UAE
+          // Auto-detect country code from phone number and split it
+          const mobileDetected = detectCountryCodeFromNumber(mergedData.mobileNumber || '');
 
-          if (cleanedPhoneNumber) {
-            // Detect country code
-            if (cleanedPhoneNumber.startsWith('+91')) {
-              detectedCountryCode = '+91';
-              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+91/, '').trim();
-            } else if (cleanedPhoneNumber.startsWith('+971')) {
-              detectedCountryCode = '+971';
-              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+971/, '').trim();
-            } else if (cleanedPhoneNumber.startsWith('+1')) {
-              detectedCountryCode = '+1';
-              cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+1/, '').trim();
-            } else if (cleanedPhoneNumber.startsWith('+')) {
-              // Extract any other country code
-              const match = cleanedPhoneNumber.match(/^\+(\d+)/);
-              if (match) {
-                detectedCountryCode = '+' + match[1];
-                cleanedPhoneNumber = cleanedPhoneNumber.replace(/^\+\d+/, '').trim();
-              }
-            }
+          console.log('📞 Original phone from localStorage:', mergedData.mobileNumber);
+          console.log('📞 Detected country code:', mobileDetected.countryCode);
+          console.log('📞 Number without code:', mobileDetected.number);
 
-            console.log('📞 Original phone:', mergedData.mobileNumber);
-            console.log('📞 Detected country code:', detectedCountryCode);
-            console.log('📞 Cleaned phone:', cleanedPhoneNumber);
-
-            // Set the detected country code
-            setMobileCountryCode(detectedCountryCode);
-            setWhatsappCountryCode(detectedCountryCode);
-          }
+          // Set the detected country code in dropdown
+          setMobileCountryCode(mobileDetected.countryCode);
+          setWhatsappCountryCode(mobileDetected.countryCode);
 
           setProfileData(prev => ({
             ...prev,
             firstName: mergedData.firstName || prev.firstName,
             lastName: mergedData.lastName || prev.lastName,
             primaryEmail: mergedData.primaryEmail || prev.primaryEmail,
-            mobileNumber: cleanedPhoneNumber || prev.mobileNumber,
+            mobileNumber: mobileDetected.number || prev.mobileNumber,
           }));
 
-          console.log('✅ Profile data populated from localStorage:', mergedData);
+          console.log('✅ Profile data populated from localStorage with auto-detection');
         }
 
         // Try to get user email from cookies
@@ -683,14 +740,24 @@ function ProfileBuilderContent() {
           console.log('✅ Profile found:', profile);
           console.log('⚙️ Preferences:', prefs);
 
+          // Auto-detect country codes from full phone numbers and split them
+          console.log('📱 Full mobile number from DB:', profile.phone_number);
+          console.log('📱 Full WhatsApp number from DB:', prefs.whatsappNumber);
+
+          const mobileDetected = detectCountryCodeFromNumber(profile.phone_number || '');
+          const whatsappDetected = detectCountryCodeFromNumber(prefs.whatsappNumber || '');
+
+          console.log('📞 Mobile detected - Code:', mobileDetected.countryCode, 'Number:', mobileDetected.number);
+          console.log('📞 WhatsApp detected - Code:', whatsappDetected.countryCode, 'Number:', whatsappDetected.number);
+
           // Map database fields to form state
           const mappedData = {
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             primaryEmail: profile.email || '',
             secondaryEmail: prefs.secondaryEmail || '',
-            mobileNumber: profile.phone_number || '',
-            whatsappNumber: prefs.whatsappNumber || '',
+            mobileNumber: mobileDetected.number,
+            whatsappNumber: whatsappDetected.number,
             showEmailPublicly: prefs.showEmailPublicly ?? true,
             showMobilePublicly: prefs.showMobilePublicly ?? true,
             showWhatsappPublicly: prefs.showWhatsappPublicly ?? false,
@@ -740,6 +807,12 @@ function ProfileBuilderContent() {
           console.log('🗺️ Mapped data:', mappedData);
           setProfileData(mappedData);
 
+          // Set detected country codes to dropdowns
+          setMobileCountryCode(mobileDetected.countryCode);
+          setWhatsappCountryCode(whatsappDetected.countryCode);
+
+          console.log('📱 Detected Mobile Country Code:', mobileDetected.countryCode);
+          console.log('📱 Detected WhatsApp Country Code:', whatsappDetected.countryCode);
           console.log('✅ Profile data loaded successfully');
         } else {
           console.log('⚠️ No profile data in response');
@@ -761,8 +834,100 @@ function ProfileBuilderContent() {
 
   // Show toast notification
   const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
+    setToastState({ message, type });
+    setTimeout(() => setToastState(null), 5000);
+  };
+
+  // Auto-save toggle changes immediately
+  const handleToggleAutoSave = async (toggleName: string, value: boolean) => {
+    // Update state first for immediate UI feedback
+    setProfileData(prev => ({ ...prev, [toggleName]: value }));
+
+    try {
+      // Show saving indicator
+      toast.loading('Saving...', { id: 'toggle-save' });
+
+      // Prepare phone numbers with country codes
+      const fullMobileNumber = profileData.mobileNumber
+        ? `${mobileCountryCode}${profileData.mobileNumber.replace(/^[\s+]*/, '')}`
+        : '';
+      const fullWhatsappNumber = profileData.whatsappNumber
+        ? `${whatsappCountryCode}${profileData.whatsappNumber.replace(/^[\s+]*/, '')}`
+        : '';
+
+      // Save to database with updated toggle value - properly map all fields
+      const response = await fetch('/api/profiles/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: profileData.primaryEmail,
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          mobileNumber: fullMobileNumber,
+          companyName: profileData.companyName,
+          profilePhoto: profileData.profilePhoto,
+          secondaryEmail: profileData.secondaryEmail,
+          whatsappNumber: fullWhatsappNumber,
+          showEmailPublicly: toggleName === 'showEmailPublicly' ? value : profileData.showEmailPublicly,
+          showMobilePublicly: toggleName === 'showMobilePublicly' ? value : profileData.showMobilePublicly,
+          showWhatsappPublicly: toggleName === 'showWhatsappPublicly' ? value : profileData.showWhatsappPublicly,
+          jobTitle: profileData.jobTitle,
+          companyWebsite: profileData.companyWebsite,
+          companyAddress: profileData.companyAddress,
+          companyLogo: profileData.companyLogo,
+          industry: profileData.industry,
+          subDomain: profileData.subDomain,
+          skills: profileData.skills,
+          professionalSummary: profileData.professionalSummary,
+          showJobTitle: toggleName === 'showJobTitle' ? value : profileData.showJobTitle,
+          showCompanyName: toggleName === 'showCompanyName' ? value : profileData.showCompanyName,
+          showCompanyWebsite: toggleName === 'showCompanyWebsite' ? value : profileData.showCompanyWebsite,
+          showCompanyAddress: toggleName === 'showCompanyAddress' ? value : profileData.showCompanyAddress,
+          showIndustry: toggleName === 'showIndustry' ? value : profileData.showIndustry,
+          showSkills: toggleName === 'showSkills' ? value : profileData.showSkills,
+          linkedinUrl: profileData.linkedinUrl,
+          instagramUrl: profileData.instagramUrl,
+          facebookUrl: profileData.facebookUrl,
+          twitterUrl: profileData.twitterUrl,
+          behanceUrl: profileData.behanceUrl,
+          dribbbleUrl: profileData.dribbbleUrl,
+          githubUrl: profileData.githubUrl,
+          youtubeUrl: profileData.youtubeUrl,
+          showLinkedin: toggleName === 'showLinkedin' ? value : profileData.showLinkedin,
+          showInstagram: toggleName === 'showInstagram' ? value : profileData.showInstagram,
+          showFacebook: toggleName === 'showFacebook' ? value : profileData.showFacebook,
+          showTwitter: toggleName === 'showTwitter' ? value : profileData.showTwitter,
+          showBehance: toggleName === 'showBehance' ? value : profileData.showBehance,
+          showDribbble: toggleName === 'showDribbble' ? value : profileData.showDribbble,
+          showGithub: toggleName === 'showGithub' ? value : profileData.showGithub,
+          showYoutube: toggleName === 'showYoutube' ? value : profileData.showYoutube,
+          backgroundImage: profileData.backgroundImage,
+          showProfilePhoto: toggleName === 'showProfilePhoto' ? value : profileData.showProfilePhoto,
+          showBackgroundImage: toggleName === 'showBackgroundImage' ? value : profileData.showBackgroundImage,
+          photos: profileData.photos,
+          videos: profileData.videos,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Saved!', { id: 'toggle-save', duration: 2000 });
+      } else {
+        throw new Error(result.error || 'Failed to save');
+      }
+    } catch (error) {
+      console.error('Error saving toggle:', error);
+      toast.error('Failed to save', { id: 'toggle-save', duration: 3000 });
+      // Revert state on error
+      setProfileData(prev => ({ ...prev, [toggleName]: !value }));
+    }
   };
 
   // Validate required fields for each section
@@ -1138,7 +1303,7 @@ function ProfileBuilderContent() {
                               <input
                                 type="checkbox"
                                 checked={profileData.showEmailPublicly}
-                                onChange={(e) => setProfileData({ ...profileData, showEmailPublicly: e.target.checked })}
+                                onChange={(e) => handleToggleAutoSave('showEmailPublicly', e.target.checked)}
                                 className="sr-only peer"
                               />
                               <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1184,9 +1349,22 @@ function ProfileBuilderContent() {
                             <input
                               type="tel"
                               value={profileData.mobileNumber}
-                              onChange={(e) => setProfileData({ ...profileData, mobileNumber: e.target.value })}
+                              onChange={(e) => {
+                                // Auto-detect country code if user types full number with code
+                                const inputValue = e.target.value;
+                                const detected = detectCountryCodeFromNumber(inputValue);
+
+                                // If country code was detected, update dropdown and show only number part
+                                if (detected.countryCode && detected.number) {
+                                  setMobileCountryCode(detected.countryCode);
+                                  setProfileData({ ...profileData, mobileNumber: detected.number });
+                                } else {
+                                  // Otherwise just store what user typed
+                                  setProfileData({ ...profileData, mobileNumber: inputValue });
+                                }
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                              placeholder="50 123 4567"
+                              placeholder="8999355932"
                             />
                           </div>
                         </div>
@@ -1213,7 +1391,7 @@ function ProfileBuilderContent() {
                               <input
                                 type="checkbox"
                                 checked={profileData.showMobilePublicly}
-                                onChange={(e) => setProfileData({ ...profileData, showMobilePublicly: e.target.checked })}
+                                onChange={(e) => handleToggleAutoSave('showMobilePublicly', e.target.checked)}
                                 className="sr-only peer"
                               />
                               <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1240,10 +1418,23 @@ function ProfileBuilderContent() {
                             <input
                               type="tel"
                               value={profileData.whatsappNumber}
-                              onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value })}
+                              onChange={(e) => {
+                                // Auto-detect country code if user types full number with code
+                                const inputValue = e.target.value;
+                                const detected = detectCountryCodeFromNumber(inputValue);
+
+                                // If country code was detected, update dropdown and show only number part
+                                if (detected.countryCode && detected.number) {
+                                  setWhatsappCountryCode(detected.countryCode);
+                                  setProfileData({ ...profileData, whatsappNumber: detected.number });
+                                } else {
+                                  // Otherwise just store what user typed
+                                  setProfileData({ ...profileData, whatsappNumber: inputValue });
+                                }
+                              }}
                               disabled={useSameNumberForWhatsapp}
                               className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none ${useSameNumberForWhatsapp ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                              placeholder="50 123 4567"
+                              placeholder="8999355932"
                             />
                           </div>
                         </div>
@@ -1253,7 +1444,7 @@ function ProfileBuilderContent() {
                               <input
                                 type="checkbox"
                                 checked={profileData.showWhatsappPublicly}
-                                onChange={(e) => setProfileData({ ...profileData, showWhatsappPublicly: e.target.checked })}
+                                onChange={(e) => handleToggleAutoSave('showWhatsappPublicly', e.target.checked)}
                                 className="sr-only peer"
                               />
                               <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1377,7 +1568,7 @@ function ProfileBuilderContent() {
                           <input
                             type="checkbox"
                             checked={profileData.showJobTitle}
-                            onChange={(e) => setProfileData({ ...profileData, showJobTitle: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showJobTitle', e.target.checked)}
                             className="sr-only peer"
                           />
                           <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1405,7 +1596,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showCompanyName}
-                            onChange={(e) => setProfileData({ ...profileData, showCompanyName: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showCompanyName', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1427,7 +1618,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showCompanyWebsite}
-                            onChange={(e) => setProfileData({ ...profileData, showCompanyWebsite: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showCompanyWebsite', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1451,7 +1642,7 @@ function ProfileBuilderContent() {
                           <input
                           type="checkbox"
                           checked={profileData.showCompanyAddress}
-                          onChange={(e) => setProfileData({ ...profileData, showCompanyAddress: e.target.checked })}
+                          onChange={(e) => handleToggleAutoSave('showCompanyAddress', e.target.checked)}
                           className="sr-only peer"
                           />
                           <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1662,7 +1853,7 @@ function ProfileBuilderContent() {
                         <input
                         type="checkbox"
                         checked={profileData.showIndustry}
-                        onChange={(e) => setProfileData({ ...profileData, showIndustry: e.target.checked })}
+                        onChange={(e) => handleToggleAutoSave('showIndustry', e.target.checked)}
                         className="sr-only peer"
                         />
                         <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1748,7 +1939,7 @@ function ProfileBuilderContent() {
                           <input
                           type="checkbox"
                           checked={profileData.showSkills}
-                          onChange={(e) => setProfileData({ ...profileData, showSkills: e.target.checked })}
+                          onChange={(e) => handleToggleAutoSave('showSkills', e.target.checked)}
                           className="sr-only peer"
                           />
                           <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1850,7 +2041,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showLinkedin}
-                            onChange={(e) => setProfileData({ ...profileData, showLinkedin: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showLinkedin', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1884,7 +2075,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showInstagram}
-                            onChange={(e) => setProfileData({ ...profileData, showInstagram: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showInstagram', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1918,7 +2109,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showFacebook}
-                            onChange={(e) => setProfileData({ ...profileData, showFacebook: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showFacebook', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1952,7 +2143,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showTwitter}
-                            onChange={(e) => setProfileData({ ...profileData, showTwitter: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showTwitter', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -1995,7 +2186,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showBehance}
-                            onChange={(e) => setProfileData({ ...profileData, showBehance: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showBehance', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -2031,7 +2222,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showDribbble}
-                            onChange={(e) => setProfileData({ ...profileData, showDribbble: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showDribbble', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -2065,7 +2256,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showGithub}
-                            onChange={(e) => setProfileData({ ...profileData, showGithub: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showGithub', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -2099,7 +2290,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showYoutube}
-                            onChange={(e) => setProfileData({ ...profileData, showYoutube: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showYoutube', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -2226,7 +2417,7 @@ function ProfileBuilderContent() {
                             <input
                             type="checkbox"
                             checked={profileData.showProfilePhoto}
-                            onChange={(e) => setProfileData({ ...profileData, showProfilePhoto: e.target.checked })}
+                            onChange={(e) => handleToggleAutoSave('showProfilePhoto', e.target.checked)}
                             className="sr-only peer"
                             />
                             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
@@ -2395,18 +2586,18 @@ function ProfileBuilderContent() {
       />
 
       {/* Toast Notification */}
-      {toast && (
+      {toastState && (
         <div className={`fixed bottom-8 right-8 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50 ${
-          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          toastState.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
         }`}>
-          {toast.type === 'success' ? (
+          {toastState.type === 'success' ? (
             <CheckCircle className="w-5 h-5" />
           ) : (
             <X2 className="w-5 h-5" />
           )}
-          <span className="font-medium">{toast.message}</span>
+          <span className="font-medium">{toastState.message}</span>
           <button
-            onClick={() => setToast(null)}
+            onClick={() => setToastState(null)}
             className="ml-2 hover:opacity-80"
           >
             <X2 className="w-4 h-4" />
