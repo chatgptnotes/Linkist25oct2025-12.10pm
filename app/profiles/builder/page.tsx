@@ -802,6 +802,14 @@ function ProfileBuilderContent() {
     try {
       console.log('📤 Submitting profile data...');
 
+      // Combine country code with phone numbers
+      const fullMobileNumber = profileData.mobileNumber
+        ? `${mobileCountryCode}${profileData.mobileNumber.replace(/^[\s+]*/, '')}`
+        : '';
+      const fullWhatsappNumber = profileData.whatsappNumber
+        ? `${whatsappCountryCode}${profileData.whatsappNumber.replace(/^[\s+]*/, '')}`
+        : '';
+
       const response = await fetch('/api/profiles/save', {
         method: 'POST',
         headers: {
@@ -811,11 +819,11 @@ function ProfileBuilderContent() {
           email: profileData.primaryEmail,
           firstName: profileData.firstName,
           lastName: profileData.lastName,
-          mobileNumber: profileData.mobileNumber,
+          mobileNumber: fullMobileNumber,
           companyName: profileData.companyName,
           profilePhoto: profileData.profilePhoto,
           secondaryEmail: profileData.secondaryEmail,
-          whatsappNumber: profileData.whatsappNumber,
+          whatsappNumber: fullWhatsappNumber,
           showEmailPublicly: profileData.showEmailPublicly,
           showMobilePublicly: profileData.showMobilePublicly,
           showWhatsappPublicly: profileData.showWhatsappPublicly,
@@ -876,7 +884,7 @@ function ProfileBuilderContent() {
           title: profileData.jobTitle,
           company: profileData.companyName,
           email: profileData.primaryEmail,
-          phone: profileData.mobileNumber,
+          phone: fullMobileNumber,
           website: profileData.companyWebsite,
           location: profileData.companyAddress,
           bio: profileData.professionalSummary,

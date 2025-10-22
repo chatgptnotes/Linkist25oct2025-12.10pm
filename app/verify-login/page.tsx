@@ -34,33 +34,6 @@ export default function VerifyLoginPage() {
     }
   }, [resendTimer]);
 
-  const handleSendOtp = async (emailOrPhone: string) => {
-    try {
-      const response = await fetch('/api/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ emailOrPhone }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        showToast('Verification code sent to your email!', 'success');
-        setResendTimer(60); // Start 60 second timer
-        if (data.devOtp && process.env.NODE_ENV === 'development') {
-          setDevOtp(data.devOtp);
-        }
-      } else {
-        showToast(data.error || 'Failed to send verification code', 'error');
-      }
-    } catch (error) {
-      console.error('Send OTP error:', error);
-      showToast('Failed to send verification code', 'error');
-    }
-  };
-
   useEffect(() => {
     // Check URL parameters first (coming from verify-mobile redirect)
     const searchParams = new URLSearchParams(window.location.search);
@@ -70,17 +43,6 @@ export default function VerifyLoginPage() {
       setEmail(emailParam);
       // Store it for the verification process
       localStorage.setItem('loginEmail', emailParam);
-
-      // Check if OTP was already sent for this email (prevent resend on refresh)
-      const otpSentKey = `email_otp_sent_${emailParam}`;
-      const alreadySent = sessionStorage.getItem(otpSentKey);
-
-      if (!alreadySent) {
-        // Mark as sent in sessionStorage
-        sessionStorage.setItem(otpSentKey, Date.now().toString());
-        // Send OTP automatically
-        handleSendOtp(emailParam);
-      }
     } else {
       // Try to get email from user profile (from onboarding)
       const userProfile = localStorage.getItem('userProfile');
@@ -107,8 +69,6 @@ export default function VerifyLoginPage() {
 
       if (emailToUse) {
         setEmail(emailToUse);
-        // Send OTP automatically for prefilled email/phone
-        handleSendOtp(emailToUse);
       } else {
         // No identifier found, redirect to login
         router.push('/login');
@@ -141,10 +101,6 @@ export default function VerifyLoginPage() {
         // Clear login email from localStorage
         localStorage.removeItem('loginEmail');
 
-        // Clear sessionStorage after successful verification
-        const otpSentKey = `email_otp_sent_${email}`;
-        sessionStorage.removeItem(otpSentKey);
-
         // Store email as verified
         localStorage.setItem('verifiedEmail', email);
         localStorage.setItem('emailVerified', 'true');
@@ -168,10 +124,6 @@ export default function VerifyLoginPage() {
   };
 
   const handleResendCode = async () => {
-    // Clear sessionStorage for this email to allow resend
-    const otpSentKey = `email_otp_sent_${email}`;
-    sessionStorage.removeItem(otpSentKey);
-
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',

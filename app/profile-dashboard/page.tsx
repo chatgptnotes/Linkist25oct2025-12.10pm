@@ -220,16 +220,11 @@ export default function AccountPage() {
     return profileData && profileData.profilePhoto;
   };
 
-  const isGalleryComplete = () => {
-    // Check profileData for gallery items
-    return profileData && ((profileData.photos && profileData.photos.length > 0) ||
-           (profileData.videos && profileData.videos.length > 0));
-  };
 
   // Calculate profile completion percentage based on actual user data
   const calculateProfileCompletion = () => {
     let completed = 0;
-    const total = 5; // Total sections
+    const total = 4; // Total sections (removed Gallery)
 
     // Basic Info - check user object for actual data
     if (isBasicInfoComplete()) completed++;
@@ -242,9 +237,6 @@ export default function AccountPage() {
 
     // Profile Photo - check if profileData has photo
     if (isProfilePhotoComplete()) completed++;
-
-    // Gallery - check if profileData has media
-    if (isGalleryComplete()) completed++;
 
     return Math.round((completed / total) * 100);
   };
@@ -378,17 +370,6 @@ export default function AccountPage() {
               </span>
             )}
 
-            {isGalleryComplete() ? (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Gallery ✓
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                Gallery Missing
-              </span>
-            )}
           </div>
         </div>
 
@@ -551,28 +532,6 @@ export default function AccountPage() {
               </Link>
 
               {/* Media Gallery Card */}
-              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-3 bg-orange-100 rounded-lg">
-                      <Gallery className="w-6 h-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Media Gallery</h3>
-                      <p className="text-sm text-gray-600">Showcase your work</p>
-                    </div>
-                  </div>
-                  {isGalleryComplete() ? (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs">!</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500">Images, videos, documents</p>
-              </Link>
-
               {/* Settings Card */}
               <Link href="/profile-dashboard/settings" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">

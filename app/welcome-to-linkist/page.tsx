@@ -29,6 +29,7 @@ export default function WelcomeToLinkist() {
   const [emailError, setEmailError] = useState<string>('');
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [checkingMobile, setCheckingMobile] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   useEffect(() => {
     // Auto-detect country based on IP
@@ -155,6 +156,9 @@ export default function WelcomeToLinkist() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Show validation errors
+    setShowValidationErrors(true);
 
     // Check if there are any existing errors
     if (emailError || mobileError) {
@@ -353,6 +357,30 @@ export default function WelcomeToLinkist() {
     }
   };
 
+  // Get missing required fields
+  const getMissingFields = () => {
+    const missing: string[] = [];
+    if (!formData.email) missing.push('Email');
+    if (!formData.firstName) missing.push('First Name');
+    if (!formData.lastName) missing.push('Last Name');
+    if (!formData.mobileNumber) missing.push('Mobile Number');
+    if (!termsAccepted) missing.push('Terms & Conditions');
+    return missing;
+  };
+
+  // Check if form is valid
+  const isFormValid = () => {
+    return (
+      formData.email &&
+      formData.firstName &&
+      formData.lastName &&
+      formData.mobileNumber &&
+      termsAccepted &&
+      !emailError &&
+      !mobileError
+    );
+  };
+
   return (
     <>
       {/* Navbar */}
@@ -415,7 +443,7 @@ export default function WelcomeToLinkist() {
               {/* Mobile Number */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Mobile Number
+                  Mobile Number <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   <div className="w-20">
@@ -440,7 +468,7 @@ export default function WelcomeToLinkist() {
                       pattern="[0-9\s]+"
                       title="Mobile number should only contain numbers"
                       className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-                        mobileError ? 'border-red-500' : 'border-gray-300'
+                        mobileError || (showValidationErrors && !formData.mobileNumber) ? 'border-red-500 bg-red-50' : 'border-gray-300'
                       }`}
                       required
                     />
@@ -471,7 +499,7 @@ export default function WelcomeToLinkist() {
               {/* Email */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Email
+                  Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -484,7 +512,7 @@ export default function WelcomeToLinkist() {
                     }}
                     onBlur={(e) => checkEmailExists(e.target.value)}
                     className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-                      emailError ? 'border-red-500' : 'border-gray-300'
+                      emailError || (showValidationErrors && !formData.email) ? 'border-red-500 bg-red-50' : 'border-gray-300'
                     }`}
                     required
                   />
@@ -511,7 +539,7 @@ export default function WelcomeToLinkist() {
               {/* First Name */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  First Name
+                  First Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -526,7 +554,9 @@ export default function WelcomeToLinkist() {
                     maxLength={30}
                     pattern="[A-Za-z\s]+"
                     title="Name should only contain letters"
-                    className="w-full px-3 py-2 pr-12 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 pr-12 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      showValidationErrors && !formData.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                     required
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
@@ -538,7 +568,7 @@ export default function WelcomeToLinkist() {
               {/* Last Name */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Last Name
+                  Last Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -553,7 +583,9 @@ export default function WelcomeToLinkist() {
                     maxLength={30}
                     pattern="[A-Za-z\s]+"
                     title="Name should only contain letters"
-                    className="w-full px-3 py-2 pr-12 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 pr-12 text-sm border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      showValidationErrors && !formData.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                     required
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
@@ -563,7 +595,9 @@ export default function WelcomeToLinkist() {
               </div>
 
               {/* Terms Checkbox */}
-              <div className="flex items-start gap-2">
+              <div className={`flex items-start gap-2 p-2 rounded-lg transition-colors ${
+                showValidationErrors && !termsAccepted ? 'bg-red-50 border border-red-300' : ''
+              }`}>
                 <input
                   type="checkbox"
                   id="termsCheckbox"
@@ -572,6 +606,7 @@ export default function WelcomeToLinkist() {
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
                 />
                 <label htmlFor="termsCheckbox" className="text-[10px] text-gray-600 cursor-pointer leading-relaxed">
+                  <span className="text-red-500 font-semibold">* </span>
                   I agree to Linkist's{' '}
                   <a href="/terms" className="text-blue-600 hover:underline" target="_blank">
                     Terms of Service
@@ -583,8 +618,32 @@ export default function WelcomeToLinkist() {
                   , and to receive OTP messages via SMS and WhatsApp. {getTermsText()}
                 </label>
               </div>
+              {showValidationErrors && !termsAccepted && (
+                <p className="text-xs text-red-600 mt-1 ml-6">Please accept the terms and conditions to continue</p>
+              )}
             </div>
           </div>
+
+          {/* Validation Helper Text */}
+          {!isFormValid() && (showValidationErrors || (!formData.email || !formData.firstName || !formData.lastName || !formData.mobileNumber || !termsAccepted)) && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-amber-800 mb-1">Please complete the following:</p>
+                  <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                    {getMissingFields().map((field, idx) => (
+                      <li key={idx}>{field}</li>
+                    ))}
+                    {emailError && <li className="text-red-600">{emailError}</li>}
+                    {mobileError && <li className="text-red-600">{mobileError}</li>}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6 justify-center">
@@ -602,6 +661,7 @@ export default function WelcomeToLinkist() {
               disabled={loading || !termsAccepted || !!emailError || !!mobileError}
               className="w-full sm:w-auto px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400 cursor-pointer"
               style={{ backgroundColor: (loading || !termsAccepted || emailError || mobileError) ? '#9CA3AF' : '#DC2626', color: '#FFFFFF' }}
+              title={!isFormValid() ? `Please complete: ${getMissingFields().join(', ')}` : ''}
             >
               {loading ? (
                 <div className="flex items-center">
