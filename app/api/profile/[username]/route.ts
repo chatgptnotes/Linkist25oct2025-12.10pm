@@ -44,6 +44,7 @@ export async function GET(
 
     // Transform database profile to frontend format
     const socialLinks = profile.social_links || {};
+    const preferences = profile.preferences || {};
 
     const profileData = {
       username: profile.custom_url,
@@ -65,6 +66,10 @@ export async function GET(
       facebook: socialLinks.facebook || '',
       youtube: socialLinks.youtube || '',
       github: socialLinks.github || '',
+      skills: profile.skills || [],
+      industry: profile.industry || '',
+      // Include visibility preferences
+      preferences: preferences,
     };
 
     // Track profile view (optional - add analytics here)

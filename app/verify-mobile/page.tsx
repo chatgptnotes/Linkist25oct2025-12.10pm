@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Logo from '@/components/Logo';
 import Toast from '@/components/Toast';
@@ -27,31 +27,39 @@ function VerifyMobileContent() {
   const [resendTimer, setResendTimer] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const otpRequestInProgress = useRef(false);
 
   useEffect(() => {
     const phoneParam = searchParams.get('phone');
-    if (phoneParam) {
+    if (phoneParam && !otpRequestInProgress.current) {
       setPhone(phoneParam);
 
       // Check if OTP was already sent for this phone number (prevent resend on refresh)
       const otpSentKey = `otp_sent_${phoneParam}`;
       const alreadySent = sessionStorage.getItem(otpSentKey);
+      const lastSentTime = alreadySent ? parseInt(alreadySent) : 0;
+      const timeSinceLastSent = Date.now() - lastSentTime;
 
-      if (!alreadySent && !otpSent) {
-        setOtpSent(true);
-        // Mark as sent in sessionStorage
+      // Only send if OTP hasn't been sent in the last 60 seconds
+      if (!alreadySent || timeSinceLastSent > 60000) {
+        // Mark as in progress to prevent duplicate calls
+        otpRequestInProgress.current = true;
+
+        // Mark as sent in sessionStorage BEFORE sending to prevent duplicate triggers
         sessionStorage.setItem(otpSentKey, Date.now().toString());
+        setOtpSent(true);
 
         // Automatically trigger OTP sending when phone is provided
         setTimeout(() => {
           handleSendOtpWithPhone(phoneParam);
         }, 500);
       } else {
-        // OTP already sent, just show verify step
+        // OTP already sent recently, just show verify step
         setStep('verify');
+        setOtpSent(true);
       }
     }
-  }, [searchParams, otpSent]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -68,6 +76,7 @@ function VerifyMobileContent() {
   const handleSendOtpWithPhone = async (phoneNumber: string) => {
     if (!validatePhone(phoneNumber)) {
       setError('Please enter a valid phone number');
+      otpRequestInProgress.current = false;
       return;
     }
 
@@ -103,6 +112,8 @@ function VerifyMobileContent() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send verification code';
       setError(errorMessage);
       setToast({ message: errorMessage, type: 'error' });
+      // Reset progress flag on error to allow retry
+      otpRequestInProgress.current = false;
     } finally {
       setSendingOtp(false);
     }
@@ -112,6 +123,9 @@ function VerifyMobileContent() {
     // Clear sessionStorage for this phone number to allow resend
     const otpSentKey = `otp_sent_${phone}`;
     sessionStorage.removeItem(otpSentKey);
+
+    // Reset the progress flag to allow resend
+    otpRequestInProgress.current = false;
 
     await handleSendOtpWithPhone(phone);
   };
@@ -297,6 +311,7 @@ function VerifyMobileContent() {
                       className="w-12 h-12 sm:w-14 sm:h-14 text-center text-xl sm:text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-red-600 focus:ring-2 focus:ring-red-100 outline-none transition-all bg-gray-50"
                       autoFocus={index === 0}
                       disabled={loading}
+                      autoComplete="off"
                     />
                   ))}
                 </div>

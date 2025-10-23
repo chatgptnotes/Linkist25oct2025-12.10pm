@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupsIcon from '@mui/icons-material/Groups';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
@@ -86,13 +86,26 @@ export default function AnalyticsPage() {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/analytics?range=${dateRange}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const response = await fetch(`/api/admin/analytics?range=${dateRange}`, {
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const analyticsData = await response.json();
         setData(analyticsData);
       }
     } catch (error) {
-      console.error('Failed to fetch analytics data:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Request timeout');
+      } else {
+        console.error('Failed to fetch analytics data:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -127,8 +140,8 @@ export default function AnalyticsPage() {
       <AdminLayout>
         <div className="p-6">
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading analytics...</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+            <span className="ml-2 text-gray-600">Loading analytics...</span>
           </div>
         </div>
       </AdminLayout>

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       hasOrderId: !!body.orderId
     });
 
-    const { cardConfig, checkoutData, paymentData, orderId } = body;
+    const { cardConfig, checkoutData, paymentData, orderId, pricing } = body;
 
     if (!cardConfig || !checkoutData) {
       console.error('❌ [process-order] Missing required data:', {
@@ -34,20 +34,31 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [process-order] Data validation passed');
 
-    // Calculate pricing
-    const quantity = cardConfig.quantity || 1;
-    const unitPrice = 29.99;
-    const subtotal = unitPrice * quantity;
-    const shippingAmount = 5.00;
-    const taxAmount = subtotal * 0.0575; // 5.75% tax
-    const totalAmount = subtotal + shippingAmount + taxAmount;
+    // Calculate pricing - use provided pricing if available (for digital-only $0 orders)
+    let subtotal, shippingAmount, taxAmount, totalAmount;
+
+    if (pricing) {
+      // Use provided pricing (e.g., for digital-only free tier)
+      subtotal = pricing.subtotal || 0;
+      shippingAmount = pricing.shipping || 0;
+      taxAmount = pricing.tax || 0;
+      totalAmount = pricing.total || 0;
+    } else {
+      // Calculate pricing for physical products
+      const quantity = cardConfig.quantity || 1;
+      const unitPrice = 29.99;
+      subtotal = unitPrice * quantity;
+      shippingAmount = 5.00;
+      taxAmount = subtotal * 0.0575; // 5.75% tax
+      totalAmount = subtotal + shippingAmount + taxAmount;
+    }
 
     console.log('💰 [process-order] Pricing calculated:', {
-      quantity,
       subtotal,
       shippingAmount,
       taxAmount,
-      totalAmount
+      totalAmount,
+      providedPricing: !!pricing
     });
 
     // Create/update user in database
@@ -78,6 +89,31 @@ export async function POST(request: NextRequest) {
     if (orderId) {
       console.log(`🔄 [process-order] Updating existing order ${orderId} with payment details...`);
 
+      // Check if orderId is a UUID or order number
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+
+      let existingOrder;
+      if (isUUID) {
+        // It's a UUID, fetch by ID
+        existingOrder = await SupabaseOrderStore.getById(orderId);
+      } else {
+        // It's an order number, fetch by order number
+        existingOrder = await SupabaseOrderStore.getByOrderNumber(orderId);
+      }
+
+      if (!existingOrder) {
+        console.error('❌ [process-order] Order not found:', orderId);
+        return NextResponse.json(
+          { error: 'Order not found' },
+          { status: 404 }
+        );
+      }
+
+      console.log('✅ [process-order] Found existing order:', {
+        id: existingOrder.id,
+        orderNumber: existingOrder.orderNumber
+      });
+
       // Build update object with payment data
       const updateData: any = {
         status: orderStatus,
@@ -90,7 +126,8 @@ export async function POST(request: NextRequest) {
         updateData.voucherDiscount = paymentData.voucherDiscount || 0;
       }
 
-      order = await SupabaseOrderStore.update(orderId, updateData);
+      // Update using the UUID from the existing order
+      order = await SupabaseOrderStore.update(existingOrder.id, updateData);
 
       if (!order) {
         console.error('❌ [process-order] Failed to update order in database');

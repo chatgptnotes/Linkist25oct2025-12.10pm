@@ -136,17 +136,29 @@ export async function sendOTPEmail({ to, otp, expiresInMinutes }: SendOTPEmailPa
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
           <title>Email Verification Code</title>
+          <style>
+            /* Ensure dark mode compatibility */
+            @media (prefers-color-scheme: dark) {
+              .email-body { background-color: #1f2937 !important; color: #f3f4f6 !important; }
+              .email-content { background-color: #374151 !important; }
+              .text-dark { color: #f3f4f6 !important; }
+              .text-muted { color: #d1d5db !important; }
+            }
+          </style>
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: #ffffff; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e5e7eb;">
-            <img src="https://linkist.2men.co/logo1.png" alt="Linkist" style="height: 60px; width: auto; max-width: 100%;" />
+        <body class="email-body" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+          <div style="background: #000000; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <!-- Logo with white text on black background - visible in all modes -->
+            <img src="https://linkist.2men.co/logo2.png" alt="Linkist" style="height: 60px; width: auto; max-width: 100%;" />
           </div>
 
-          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
-            <h2 style="color: #111827; margin-top: 0;">Verify Your Email</h2>
+          <div class="email-content" style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 class="text-dark" style="color: #111827; margin-top: 0;">Verify Your Email</h2>
 
-            <p style="font-size: 16px; color: #4b5563;">
+            <p class="text-dark" style="font-size: 16px; color: #4b5563;">
               Use this verification code to complete your email verification:
             </p>
 
@@ -156,17 +168,17 @@ export async function sendOTPEmail({ to, otp, expiresInMinutes }: SendOTPEmailPa
               </div>
             </div>
 
-            <p style="font-size: 14px; color: #6b7280;">
+            <p class="text-muted" style="font-size: 14px; color: #6b7280;">
               This code will expire in <strong>${expiresInMinutes} minutes</strong>.
             </p>
 
-            <p style="font-size: 14px; color: #6b7280;">
+            <p class="text-muted" style="font-size: 14px; color: #6b7280;">
               If you didn't request this code, please ignore this email.
             </p>
 
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+            <p class="text-muted" style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
               © 2025 Linkist NFC. All rights reserved.<br>
               Professional NFC business cards for modern networking.
             </p>

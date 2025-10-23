@@ -235,6 +235,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <Link
                   key={item.name}
                   href={item.href}
+                  prefetch={true}
                   className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
                     isActive
                       ? 'bg-slate-700 text-white'

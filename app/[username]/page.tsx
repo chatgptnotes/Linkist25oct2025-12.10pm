@@ -49,6 +49,18 @@ interface ProfileData {
   dribbbleUrl: string;
   githubUrl: string;
   youtubeUrl: string;
+  // Basic Information toggles
+  showEmailPublicly: boolean;
+  showMobilePublicly: boolean;
+  showWhatsappPublicly: boolean;
+  // Professional Information toggles
+  showJobTitle: boolean;
+  showCompanyName: boolean;
+  showCompanyWebsite: boolean;
+  showCompanyAddress: boolean;
+  showIndustry: boolean;
+  showSkills: boolean;
+  // Social Media toggles
   showLinkedin: boolean;
   showInstagram: boolean;
   showFacebook: boolean;
@@ -57,6 +69,7 @@ interface ProfileData {
   showDribbble: boolean;
   showGithub: boolean;
   showYoutube: boolean;
+  // Media toggles
   profilePhoto: string | null;
   backgroundImage: string | null;
   showProfilePhoto: boolean;
@@ -103,6 +116,8 @@ export default function ProfilePreviewPage() {
           console.log('✅ Found profile in database for username:', username);
 
           // Map API response to ProfileData format
+          const prefs = dbProfile.preferences || {};
+
           const mappedProfile: ProfileData = {
             firstName: dbProfile.firstName || '',
             lastName: dbProfile.lastName || '',
@@ -115,9 +130,9 @@ export default function ProfilePreviewPage() {
             companyWebsite: dbProfile.website || '',
             companyAddress: dbProfile.location || '',
             companyLogo: null,
-            industry: '',
+            industry: dbProfile.industry || '',
             subDomain: '',
-            skills: [],
+            skills: dbProfile.skills || [],
             professionalSummary: dbProfile.bio || '',
             linkedinUrl: dbProfile.linkedin || '',
             instagramUrl: dbProfile.instagram || '',
@@ -127,18 +142,28 @@ export default function ProfilePreviewPage() {
             dribbbleUrl: '',
             githubUrl: dbProfile.github || '',
             youtubeUrl: dbProfile.youtube || '',
-            showLinkedin: !!dbProfile.linkedin,
-            showInstagram: !!dbProfile.instagram,
-            showFacebook: !!dbProfile.facebook,
-            showTwitter: !!dbProfile.twitter,
-            showBehance: false,
-            showDribbble: false,
-            showGithub: !!dbProfile.github,
-            showYoutube: !!dbProfile.youtube,
+            // Read toggle values from saved preferences
+            showEmailPublicly: prefs.showEmailPublicly ?? true,
+            showMobilePublicly: prefs.showMobilePublicly ?? true,
+            showWhatsappPublicly: prefs.showWhatsappPublicly ?? false,
+            showJobTitle: prefs.showJobTitle ?? true,
+            showCompanyName: prefs.showCompanyName ?? true,
+            showCompanyWebsite: prefs.showCompanyWebsite ?? true,
+            showCompanyAddress: prefs.showCompanyAddress ?? true,
+            showIndustry: prefs.showIndustry ?? true,
+            showSkills: prefs.showSkills ?? true,
+            showLinkedin: prefs.showLinkedin ?? false,
+            showInstagram: prefs.showInstagram ?? false,
+            showFacebook: prefs.showFacebook ?? false,
+            showTwitter: prefs.showTwitter ?? false,
+            showBehance: prefs.showBehance ?? false,
+            showDribbble: prefs.showDribbble ?? false,
+            showGithub: prefs.showGithub ?? false,
+            showYoutube: prefs.showYoutube ?? false,
             profilePhoto: dbProfile.profileImage || null,
             backgroundImage: dbProfile.coverImage || null,
-            showProfilePhoto: !!dbProfile.profileImage,
-            showBackgroundImage: !!dbProfile.coverImage,
+            showProfilePhoto: prefs.showProfilePhoto ?? true,
+            showBackgroundImage: prefs.showBackgroundImage ?? true,
           };
 
           console.log('✅ Mapped profile data for preview');
@@ -314,15 +339,15 @@ export default function ProfilePreviewPage() {
                   {profileData.firstName} {profileData.lastName}
                 </h1>
                  {/* Job Title */}
-                 {profileData.jobTitle && (
+                 {profileData.showJobTitle && profileData.jobTitle && (
                   <p className="text-sm sm:text-base text-gray-700 mb-2">
                     {profileData.jobTitle}
-                    {profileData.companyName && ` @${profileData.companyName}`}
+                    {profileData.showCompanyName && profileData.companyName && ` @${profileData.companyName}`}
                   </p>
                 )}
                 {/* Company & Industry */}
                 <div className="space-y-1 text-xs sm:text-sm text-gray-600">
-                  {profileData.companyName && profileData.industry && (
+                  {profileData.showCompanyName && profileData.companyName && profileData.showIndustry && profileData.industry && (
                     <p>
                       {profileData.companyName} - {profileData.industry}
                     </p>
@@ -360,7 +385,7 @@ export default function ProfilePreviewPage() {
                 {/* Left Column */}
                 <div>
                   <div className="space-y-3">
-                    {profileData.primaryEmail && (
+                    {profileData.showEmailPublicly && profileData.primaryEmail && (
                       <div className="flex items-start gap-3">
                         <Email className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                         <a href={`mailto:${profileData.primaryEmail}`} className="text-sm text-gray-700 hover:text-blue-600 break-all">
@@ -368,7 +393,7 @@ export default function ProfilePreviewPage() {
                         </a>
                       </div>
                     )}
-                    {profileData.mobileNumber && (
+                    {profileData.showMobilePublicly && profileData.mobileNumber && (
                       <div className="flex items-center gap-3">
                         <Phone className="w-5 h-5 text-blue-600 flex-shrink-0" />
                         <a href={`tel:${profileData.mobileNumber}`} className="text-sm text-gray-700 hover:text-blue-600">
@@ -376,7 +401,7 @@ export default function ProfilePreviewPage() {
                         </a>
                       </div>
                     )}
-                    {profileData.companyWebsite && (
+                    {profileData.showCompanyWebsite && profileData.companyWebsite && (
                       <div className="flex items-start gap-3">
                         <Language className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                         <a href={profileData.companyWebsite} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">
@@ -384,7 +409,7 @@ export default function ProfilePreviewPage() {
                         </a>
                       </div>
                     )}
-                    {profileData.companyAddress && (
+                    {profileData.showCompanyAddress && profileData.companyAddress && (
                       <div className="flex items-start gap-3">
                         <LocationOn className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                         <span className="text-sm text-gray-700">{profileData.companyAddress}</span>
@@ -395,7 +420,7 @@ export default function ProfilePreviewPage() {
 
                 {/* Right Column - Skills */}
                 <div>
-                  {profileData.skills && profileData.skills.length > 0 && (
+                  {profileData.showSkills && profileData.skills && profileData.skills.length > 0 && (
                     <>
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Skills & Expertise</h4>
                       <div className="flex flex-wrap gap-2">

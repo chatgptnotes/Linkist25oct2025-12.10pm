@@ -163,7 +163,7 @@ export default function OrdersPage() {
                 Back to Dashboard
               </Link>
               <Link
-                href="/welcome-to-linkist"
+                href="/product-selection"
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
               >
                 Order New Card
@@ -193,7 +193,7 @@ export default function OrdersPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-2">No Orders Yet</h2>
             <p className="text-gray-600 mb-6">You haven't placed any orders yet. Get started with your first NFC card!</p>
             <Link
-              href="/welcome-to-linkist"
+              href="/product-selection"
               className="inline-block bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium"
             >
               Order Your First Card

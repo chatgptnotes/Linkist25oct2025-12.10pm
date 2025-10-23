@@ -8,7 +8,6 @@ import LanguageIcon from '@mui/icons-material/Language';
 const Globe = LanguageIcon;
 import { useToast } from '@/components/ToastProvider';
 import Footer from '@/components/Footer';
-import Navbar from '@/components/Navbar';
 
 export default function WelcomeToLinkist() {
   const router = useRouter();
@@ -383,10 +382,7 @@ export default function WelcomeToLinkist() {
 
   return (
     <>
-      {/* Navbar */}
-      <Navbar />
-
-      <div className="bg-gray-50 flex items-start justify-center pt-20 md:pt-24 pb-4 px-4 min-h-screen">
+      <div className="bg-gray-50 flex items-center justify-center py-20 px-4 min-h-screen">
         <div className="bg-white rounded-none sm:rounded-2xl shadow-xl max-w-3xl w-full p-4 sm:p-6 mb-8">
         {/* Title */}
         <div className="text-center mb-4">

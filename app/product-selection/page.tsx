@@ -88,7 +88,7 @@ export default function ProductSelectionPage() {
             id: plan.type,
             title: plan.name,
             subtitle: plan.description,
-            price: `Starting from $${plan.price}`,
+            price: `$${plan.price}`,
             priceLabel: priceLabel,
             icon: icon,
             features: plan.features || [],
@@ -117,7 +117,7 @@ export default function ProductSelectionPage() {
         id: 'physical-digital',
         title: 'Physical NFC Card + Linkist App',
         subtitle: '1 year subscription & AI Credits',
-        price: 'Starting from $29',
+        price: '$29',
         priceLabel: 'Most Popular',
         icon: <CreditCard className="w-6 h-6" />,
         features: [
@@ -136,7 +136,7 @@ export default function ProductSelectionPage() {
         id: 'digital-with-app',
         title: 'Digital Profile + Linkist App',
         subtitle: '1 year subscription & AI Credits',
-        price: 'Starting from $19',
+        price: '$19',
         priceLabel: 'Best Value',
         icon: <Smartphone className="w-6 h-6" />,
         features: [

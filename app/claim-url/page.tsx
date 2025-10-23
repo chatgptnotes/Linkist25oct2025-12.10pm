@@ -180,12 +180,6 @@ export default function ClaimURLPage() {
         localStorage.setItem('claimedUsername', username);
         localStorage.setItem('profileUrl', data.profileUrl);
 
-        // Show success toast with full URL
-        toast.success('Success! Your profile is now available', {
-          description: data.profileUrl,
-          duration: 5000,
-        });
-
         // Redirect to profile builder after a short delay
         setTimeout(() => {
           router.push('/profiles/builder');
