@@ -9,12 +9,14 @@ import EmailIcon from '@mui/icons-material/Email';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import PhoneIcon from '@mui/icons-material/Phone';
 
 // Icon aliases
 const Mail = EmailIcon;
 const ArrowLeft = ArrowBackIcon;
 const CheckCircle = CheckCircleIcon;
 const Key = VpnKeyIcon;
+const Phone = PhoneIcon;
 
 export default function VerifyLoginPage() {
   const router = useRouter();
@@ -25,6 +27,7 @@ export default function VerifyLoginPage() {
   const [devOtp, setDevOtp] = useState('');
   const [success, setSuccess] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [isPhone, setIsPhone] = useState(false);
 
   // Timer countdown effect
   useEffect(() => {
@@ -69,6 +72,8 @@ export default function VerifyLoginPage() {
 
       if (emailToUse) {
         setEmail(emailToUse);
+        // Detect if it's a phone number (no @ symbol)
+        setIsPhone(!emailToUse.includes('@'));
       } else {
         // No identifier found, redirect to login
         router.push('/login');
@@ -82,9 +87,6 @@ export default function VerifyLoginPage() {
     setLoading(true);
 
     try {
-      // Determine if email is actually a phone number
-      const isPhone = email && !email.includes('@');
-
       const response = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: {
@@ -96,7 +98,7 @@ export default function VerifyLoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        showToast('Email verified successfully!', 'success');
+        showToast(isPhone ? 'Phone verified successfully!' : 'Email verified successfully!', 'success');
 
         // Clear login email from localStorage
         localStorage.removeItem('loginEmail');
@@ -108,9 +110,9 @@ export default function VerifyLoginPage() {
         // Show success state
         setSuccess(true);
 
-        // Redirect existing users to e-commerce journey instead of profile dashboard
+        // Redirect to profile dashboard after successful login
         setTimeout(() => {
-          window.location.href = '/product-selection';
+          window.location.href = '/profile-dashboard';
         }, 2000);
       } else {
         showToast(data.error || 'Invalid verification code', 'error');
@@ -159,9 +161,11 @@ export default function VerifyLoginPage() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Email Verified!</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+              {isPhone ? 'Phone Verified!' : 'Email Verified!'}
+            </h2>
             <p className="text-gray-600 text-sm sm:text-base mb-6">
-              Your email has been successfully verified.
+              Your {isPhone ? 'phone number' : 'email'} has been successfully verified.
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
@@ -179,26 +183,30 @@ export default function VerifyLoginPage() {
       <div className="min-h-screen bg-gray-50 flex items-start justify-center pt-20 pb-0 px-4">
         <div className="bg-white rounded-none sm:rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8">
           <h2 className="text-center text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Verify your email
+            {isPhone ? 'Verify your phone' : 'Verify your email'}
           </h2>
           <p className="text-center text-xs sm:text-sm text-gray-600 mb-6">
             We sent a verification code to{' '}
             <span className="font-medium text-gray-900">{email}</span>
           </p>
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Email field - shown but read-only */}
+            {/* Email/Phone field - shown but read-only */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
+                {isPhone ? 'Phone Number' : 'Email'}
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  {isPhone ? (
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  )}
                 </div>
                 <input
                   id="email"
                   name="email"
-                  type="email"
+                  type={isPhone ? "tel" : "email"}
                   value={email}
                   readOnly
                   className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 sm:text-sm cursor-not-allowed"

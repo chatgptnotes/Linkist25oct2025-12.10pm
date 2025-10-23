@@ -74,12 +74,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // For phone input, concatenate country code with phone number
+      const identifier = inputType === 'phone'
+        ? `${countryCode}${formData.emailOrPhone}`
+        : formData.emailOrPhone;
+
+      console.log('🔐 Login attempt with:', identifier);
+
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ emailOrPhone: formData.emailOrPhone }),
+        body: JSON.stringify({ emailOrPhone: identifier }),
       });
 
       const data = await response.json();
@@ -87,7 +94,7 @@ export default function LoginPage() {
       if (response.ok) {
         showToast('Verification code sent to your email!', 'success');
         // Store email/phone and return URL for verification
-        localStorage.setItem('loginIdentifier', formData.emailOrPhone);
+        localStorage.setItem('loginIdentifier', identifier);
         localStorage.setItem('returnUrl', returnUrl);
         router.push('/verify-login');
       } else {

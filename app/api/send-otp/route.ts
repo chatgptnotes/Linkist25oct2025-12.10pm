@@ -267,24 +267,58 @@ export async function POST(request: NextRequest) {
       // Clean phone number (remove spaces, dashes, parentheses)
       const cleanPhone = emailOrPhone.replace(/[\s-()]/g, '');
 
-      // Try multiple phone number formats
+      // Extract the base number (without country code)
+      const baseNumber = cleanPhone.replace(/^\+?(\d+)/, (match, num) => {
+        // Remove common country codes to get base number
+        if (num.startsWith('971')) return num.slice(3); // UAE
+        if (num.startsWith('91')) return num.slice(2);  // India
+        if (num.startsWith('1')) return num.slice(1);   // US
+        if (num.startsWith('44')) return num.slice(2);  // UK
+        if (num.startsWith('966')) return num.slice(3); // Saudi
+        if (num.startsWith('974')) return num.slice(3); // Qatar
+        if (num.startsWith('968')) return num.slice(3); // Oman
+        if (num.startsWith('965')) return num.slice(3); // Kuwait
+        if (num.startsWith('973')) return num.slice(3); // Bahrain
+        return num;
+      });
+
+      // Try multiple phone number formats with common country codes
       const phoneVariants = [
-        cleanPhone,                    // As entered
-        `+${cleanPhone}`,              // With + prefix
-        `+91${cleanPhone}`,            // With India country code
-        cleanPhone.replace(/^\+/, '')  // Remove + if present
+        cleanPhone,                     // As entered (e.g., +91504431709)
+        `+${cleanPhone}`,               // With + prefix
+        cleanPhone.replace(/^\+/, ''),  // Without + (e.g., 91504431709)
+        baseNumber,                     // Just the number (e.g., 504431709)
+        `+91${baseNumber}`,             // India code + number
+        `+971${baseNumber}`,            // UAE code + number
+        `+1${baseNumber}`,              // US code + number
+        `+44${baseNumber}`,             // UK code + number
+        `+966${baseNumber}`,            // Saudi code + number
+        `+974${baseNumber}`,            // Qatar code + number
+        `+968${baseNumber}`,            // Oman code + number
+        `+965${baseNumber}`,            // Kuwait code + number
+        `+973${baseNumber}`,            // Bahrain code + number
       ];
 
-      console.log('🔍 Trying phone number variants:', phoneVariants);
+      // Remove duplicates
+      const uniqueVariants = [...new Set(phoneVariants)];
+
+      console.log('🔍 Trying phone number variants for:', emailOrPhone);
+      console.log('📱 Base number extracted:', baseNumber);
+      console.log('🔎 Variants to try:', uniqueVariants);
 
       // Try each variant until we find a match
-      for (const variant of phoneVariants) {
+      for (const variant of uniqueVariants) {
         user = await SupabaseUserStore.getByPhone(variant);
         if (user) {
           console.log('✅ Found user with phone variant:', variant);
+          console.log('💾 User phone stored as:', user.phone_number);
           userPhone = user.phone_number || variant; // Use stored phone number
           break;
         }
+      }
+
+      if (!user) {
+        console.log('❌ No user found after trying all variants');
       }
 
       if (user && user.email) {
