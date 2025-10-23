@@ -68,11 +68,11 @@ export async function POST(request: NextRequest) {
     processingLocks.set(identifier, true);
     console.log(`🔐 Processing lock acquired for ${identifier}`);
 
-    // Set auto-release timeout (30 seconds max)
+    // Set auto-release timeout (10 seconds max - reduced from 30s for faster recovery)
     const lockTimeout = setTimeout(() => {
       processingLocks.delete(identifier);
-      console.log(`⏰ Lock auto-released for ${identifier}`);
-    }, 30000);
+      console.log(`⏰ Lock auto-released for ${identifier} after 10s timeout`);
+    }, 10000);
     lockTimeouts.set(identifier, lockTimeout);
 
     // Mark this identifier as having received an OTP
@@ -444,11 +444,21 @@ export async function POST(request: NextRequest) {
       const twilioVerifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
       const useTwilio = twilioAccountSid && twilioAuthToken && twilioVerifyServiceSid;
 
+      console.log('🔧 Twilio Configuration Status:', {
+        accountSid: twilioAccountSid ? '✅ Set' : '❌ Missing',
+        authToken: twilioAuthToken ? '✅ Set' : '❌ Missing',
+        verifyServiceSid: twilioVerifyServiceSid ? '✅ Set' : '❌ Missing',
+        useTwilio
+      });
+
       if (useTwilio) {
         // Use Twilio SMS
         try {
-          console.log('📞 [send-otp] Sending SMS via Twilio to:', userPhone);
-          console.log('📞 [send-otp] IMPORTANT: Store this phone format for verification:', userPhone);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📞 [TWILIO LOGIN] Sending SMS via Twilio to:', userPhone);
+          console.log('🔐 Processing Lock:', processingLocks.get(userPhone));
+          console.log('⏱️  Timestamp:', new Date().toISOString());
+
           const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
 
           const verification = await twilioClient.verify.v2
@@ -501,7 +511,12 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // No Twilio configured, use database OTP
-        console.log('⚠️ Twilio not configured, using database OTP');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('⚠️  [NO TWILIO] Twilio not configured, using database OTP');
+        console.log('💡 Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID');
+        console.log('📱 Phone:', userPhone);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
         const otp = generateMobileOTP();
         const expiresAt = new Date(Date.now() + (10 * 60 * 1000)).toISOString();
 
@@ -513,16 +528,17 @@ export async function POST(request: NextRequest) {
           verified: false
         });
 
-        console.log('📱 Database OTP generated:', otp);
+        console.log('📱 Database OTP generated for', userPhone, ':', otp);
 
         return NextResponse.json({
           success: true,
-          message: 'Verification code generated',
+          message: 'Verification code generated (SMS not configured)',
           type: 'sms',
           identifier: userPhone,
           userEmail: userEmail,
-          devOtp: otp, // Always show in dev mode
-          smsStatus: 'database'
+          devOtp: otp, // Always show for debugging
+          smsStatus: 'database',
+          twilioConfigured: false
         });
       }
     }
