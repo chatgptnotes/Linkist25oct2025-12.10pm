@@ -151,17 +151,15 @@ export default function ProductSelectionPage() {
       {
         id: 'digital-only',
         title: 'Digital Profile Only',
-        subtitle: 'Without Linkist App & AI credits',
-        price: 'Starting from $9',
-        priceLabel: 'Basic',
+        subtitle: 'Digital Profile Without Linkist App',
+        price: '$0',
+        priceLabel: 'Free',
         icon: <User className="w-6 h-6" />,
         features: [
-          'Digital Business Card',
-          'Basic Profile',
-          'Unlimited Profile Updates',
-          'QR Code Generation',
-          'Basic Analytics',
-          'Community Support'
+          'Digital profile',
+          'Basic analytics',
+          'Profile customization',
+          'Standard support'
         ]
       }
     ];
@@ -191,77 +189,124 @@ export default function ProductSelectionPage() {
     localStorage.setItem('productSelection', selectedProduct);
 
     // Route based on product type
-    setTimeout(() => {
-      if (selectedProduct === 'digital-only') {
-        // Digital Profile Only → Create order data and redirect to success page
-        const userProfile = localStorage.getItem('userProfile');
-        let email = '';
-        let firstName = 'User';
-        let lastName = 'Name';
-        let phoneNumber = '';
-        let country = 'US';
+    if (selectedProduct === 'digital-only') {
+      // Digital Profile Only → Create order in database and redirect to success page
+      const userProfile = localStorage.getItem('userProfile');
+      let email = '';
+      let firstName = 'User';
+      let lastName = 'Name';
+      let phoneNumber = '';
+      let country = 'US';
 
-        if (userProfile) {
-          try {
-            const profile = JSON.parse(userProfile);
-            email = profile.email || '';
-            firstName = profile.firstName || 'User';
-            lastName = profile.lastName || 'Name';
-            phoneNumber = profile.mobile || '';
-            country = profile.country || 'US';
-          } catch (error) {
-            console.error('Error parsing user profile:', error);
-          }
+      if (userProfile) {
+        try {
+          const profile = JSON.parse(userProfile);
+          email = profile.email || '';
+          firstName = profile.firstName || 'User';
+          lastName = profile.lastName || 'Name';
+          phoneNumber = profile.mobile || '';
+          country = profile.country || 'US';
+        } catch (error) {
+          console.error('Error parsing user profile:', error);
         }
+      }
 
-        // Create order data for digital-only product
-        const digitalOnlyPrice = 9;
-        const taxAmount = country === 'IN' ? digitalOnlyPrice * 0.18 : digitalOnlyPrice * 0.05;
-        const totalAmount = digitalOnlyPrice + taxAmount;
+      // Create order data for digital-only product (FREE - $0)
+      const digitalOnlyPrice = 0;
+      const taxAmount = 0;
+      const totalAmount = 0;
 
-        const digitalOnlyOrder = {
-          orderId: `digital-free-${Date.now()}`,
-          orderNumber: `DIG-FREE-${Date.now()}`,
-          customerName: `${firstName} ${lastName}`,
-          email,
-          phoneNumber,
-          cardConfig: {
-            firstName,
-            lastName,
-            baseMaterial: 'digital',
-            color: 'none',
-            quantity: 1,
-            isDigitalOnly: true,
-            fullName: `${firstName} ${lastName}`
+      const cardConfig = {
+        firstName,
+        lastName,
+        baseMaterial: 'digital',
+        color: 'none',
+        quantity: 1,
+        isDigitalOnly: true,
+        fullName: `${firstName} ${lastName}`
+      };
+
+      const checkoutData = {
+        fullName: `${firstName} ${lastName}`,
+        email,
+        phoneNumber,
+        country,
+        addressLine1: 'N/A - Digital Product',
+        addressLine2: '',
+        city: 'N/A',
+        state: 'N/A',
+        postalCode: 'N/A'
+      };
+
+      try {
+        // Call API to create order in database
+        const response = await fetch('/api/process-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          shipping: {
-            fullName: `${firstName} ${lastName}`,
+          body: JSON.stringify({
+            cardConfig,
+            checkoutData,
+            paymentData: null, // No payment needed for free tier
+            pricing: {
+              subtotal: digitalOnlyPrice,
+              shipping: 0,
+              tax: taxAmount,
+              total: totalAmount
+            }
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.order) {
+          // Order created successfully in database
+          const digitalOnlyOrder = {
+            orderId: result.order.id,
+            orderNumber: result.order.orderNumber,
+            customerName: `${firstName} ${lastName}`,
             email,
-            phone: phoneNumber,
             phoneNumber,
-            country,
-            addressLine1: 'N/A - Digital Product',
-            city: 'N/A',
-            postalCode: 'N/A',
-            isFounderMember: false
-          },
-          pricing: {
-            subtotal: digitalOnlyPrice,
-            taxAmount: taxAmount,
-            shippingCost: 0,
-            total: totalAmount
-          },
-          isDigitalProduct: true,
-          isDigitalOnly: true
-        };
+            cardConfig,
+            shipping: {
+              fullName: `${firstName} ${lastName}`,
+              email,
+              phone: phoneNumber,
+              phoneNumber,
+              country,
+              addressLine1: 'N/A - Digital Product',
+              city: 'N/A',
+              postalCode: 'N/A',
+              isFounderMember: false
+            },
+            pricing: {
+              subtotal: digitalOnlyPrice,
+              taxAmount: taxAmount,
+              shippingCost: 0,
+              total: totalAmount
+            },
+            isDigitalProduct: true,
+            isDigitalOnly: true
+          };
 
-        // Store order confirmation for success page
-        localStorage.setItem('orderConfirmation', JSON.stringify(digitalOnlyOrder));
+          // Store order confirmation for success page
+          localStorage.setItem('orderConfirmation', JSON.stringify(digitalOnlyOrder));
 
-        // Redirect to success page
-        router.push('/nfc/success');
-      } else if (selectedProduct === 'digital-with-app') {
-        // Digital Profile + Linkist App → Payment page directly
+          // Redirect to success page
+          router.push('/nfc/success');
+        } else {
+          showToast(result.error || 'Failed to create order', 'error');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error creating order:', error);
+        showToast('Failed to create order. Please try again.', 'error');
+        setLoading(false);
+      }
+    } else if (selectedProduct === 'digital-with-app') {
+      // Digital Profile + Linkist App → Payment page directly
+      setTimeout(() => {
         const userProfile = localStorage.getItem('userProfile');
         let email = '';
         let firstName = 'User';
@@ -324,14 +369,18 @@ export default function ProductSelectionPage() {
 
         localStorage.setItem('pendingOrder', JSON.stringify(digitalOrder));
         router.push('/nfc/payment');
-      } else if (selectedProduct === 'physical-digital') {
-        // Physical Card + Digital Profile → Configure page
+      }, 500);
+    } else if (selectedProduct === 'physical-digital') {
+      // Physical Card + Digital Profile → Configure page
+      setTimeout(() => {
         router.push('/nfc/configure');
-      } else {
-        // Default fallback
+      }, 500);
+    } else {
+      // Default fallback
+      setTimeout(() => {
         router.push('/nfc/configure');
-      }
-    }, 500);
+      }, 500);
+    }
   };
 
   return (
@@ -427,7 +476,7 @@ export default function ProductSelectionPage() {
                 {/* Price */}
                 <div className="mb-3">
                   <p className="text-xl font-bold text-gray-900">
-                    {option.price.split(' ')[2]}
+                    {option.price}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {option.priceLabel}
