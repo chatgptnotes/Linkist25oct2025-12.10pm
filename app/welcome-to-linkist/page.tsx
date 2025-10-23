@@ -156,6 +156,12 @@ export default function WelcomeToLinkist() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent duplicate submissions
+    if (loading) {
+      console.log('⚠️ Form submission already in progress, ignoring duplicate call');
+      return;
+    }
+
     // Show validation errors
     setShowValidationErrors(true);
 
@@ -229,6 +235,7 @@ export default function WelcomeToLinkist() {
       }
 
       // Step 2: Send OTP to user's mobile for verification
+      console.log('📱 Sending OTP to mobile:', fullMobile);
       const otpResponse = await fetch('/api/send-otp', {
         method: 'POST',
         headers: {
@@ -239,7 +246,11 @@ export default function WelcomeToLinkist() {
         }),
       });
 
+      console.log('📱 OTP API response status:', otpResponse.status);
+
       if (otpResponse.ok) {
+        const otpData = await otpResponse.json();
+        console.log('✅ OTP sent successfully:', otpData);
         showToast('Verification code sent to your mobile!', 'success');
 
         // Mark as onboarded

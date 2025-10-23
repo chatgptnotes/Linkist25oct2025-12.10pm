@@ -5,10 +5,44 @@ import { SupabaseUserStore } from '@/lib/supabase-user-store';
 import { memoryOTPStore, generateOTP } from '@/lib/memory-otp-store';
 import twilio from 'twilio';
 
+// Rate limiting: Track recent OTP sends to prevent duplicates
+const recentOTPSends = new Map<string, number>();
+const OTP_SEND_COOLDOWN = 5000; // 5 seconds cooldown between OTP sends
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { emailOrPhone, email, mobile, firstName, lastName } = body;
+
+    // Determine identifier for rate limiting
+    const identifier = email || mobile || emailOrPhone;
+
+    // Check if OTP was recently sent to this identifier
+    const lastSentTime = recentOTPSends.get(identifier);
+    const now = Date.now();
+
+    if (lastSentTime && (now - lastSentTime) < OTP_SEND_COOLDOWN) {
+      const waitTime = Math.ceil((OTP_SEND_COOLDOWN - (now - lastSentTime)) / 1000);
+      console.log(`⚠️ Duplicate OTP request blocked for ${identifier}. Wait ${waitTime}s`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Please wait ${waitTime} seconds before requesting another code`,
+          rateLimited: true
+        },
+        { status: 429 }
+      );
+    }
+
+    // Mark this identifier as having received an OTP
+    recentOTPSends.set(identifier, now);
+
+    // Clean up old entries (older than 1 minute)
+    for (const [key, time] of recentOTPSends.entries()) {
+      if (now - time > 60000) {
+        recentOTPSends.delete(key);
+      }
+    }
 
     // New registration flow (has email OR mobile with firstName/lastName)
     const isNewRegistration = (email || mobile) && firstName && lastName;
