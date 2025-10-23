@@ -9,13 +9,30 @@ import twilio from 'twilio';
 const recentOTPSends = new Map<string, number>();
 const OTP_SEND_COOLDOWN = 5000; // 5 seconds cooldown between OTP sends
 
+// Processing lock: Prevent concurrent processing of same identifier
+const processingLocks = new Map<string, boolean>();
+const lockTimeouts = new Map<string, NodeJS.Timeout>();
+
+// Helper function to release processing lock
+function releaseLock(identifier: string) {
+  const timeout = lockTimeouts.get(identifier);
+  if (timeout) {
+    clearTimeout(timeout);
+    lockTimeouts.delete(identifier);
+  }
+  processingLocks.delete(identifier);
+  console.log(`🔓 Processing lock released for ${identifier}`);
+}
+
 export async function POST(request: NextRequest) {
+  let identifier: string | undefined;
+
   try {
     const body = await request.json();
     const { emailOrPhone, email, mobile, firstName, lastName } = body;
 
     // Determine identifier for rate limiting
-    const identifier = email || mobile || emailOrPhone;
+    identifier = email || mobile || emailOrPhone;
 
     // Check if OTP was recently sent to this identifier
     const lastSentTime = recentOTPSends.get(identifier);
@@ -33,6 +50,30 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
+
+    // Check if request is currently being processed
+    if (processingLocks.get(identifier)) {
+      console.log(`🔒 Request already in progress for ${identifier}, blocking duplicate`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Request already in progress. Please wait.',
+          rateLimited: true
+        },
+        { status: 429 }
+      );
+    }
+
+    // Acquire processing lock
+    processingLocks.set(identifier, true);
+    console.log(`🔐 Processing lock acquired for ${identifier}`);
+
+    // Set auto-release timeout (30 seconds max)
+    const lockTimeout = setTimeout(() => {
+      processingLocks.delete(identifier);
+      console.log(`⏰ Lock auto-released for ${identifier}`);
+    }, 30000);
+    lockTimeouts.set(identifier, lockTimeout);
 
     // Mark this identifier as having received an OTP
     recentOTPSends.set(identifier, now);
@@ -169,9 +210,14 @@ export async function POST(request: NextRequest) {
 
         if (useTwilio) {
           try {
-            console.log('📞 Sending SMS via Twilio to:', mobile);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📞 [TWILIO START] Sending SMS to:', mobile);
+            console.log('🔐 Request Lock Status:', processingLocks.get(mobile));
+            console.log('⏱️  Timestamp:', new Date().toISOString());
+
             const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
 
+            console.log('📤 Calling Twilio Verify API...');
             const verification = await twilioClient.verify.v2
               .services(twilioVerifyServiceSid)
               .verifications.create({
@@ -179,7 +225,9 @@ export async function POST(request: NextRequest) {
                 channel: 'sms'
               });
 
-            console.log('✅ Twilio SMS sent successfully:', verification.status);
+            console.log('✅ [TWILIO SUCCESS] SMS sent:', verification.status);
+            console.log('📱 Verification SID:', verification.sid);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
             // Store in database as backup with registration data (with fallback)
             try {
@@ -571,6 +619,11 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to send verification code' },
       { status: 500 }
     );
+  } finally {
+    // Always release the lock
+    if (identifier) {
+      releaseLock(identifier);
+    }
   }
 }
 
