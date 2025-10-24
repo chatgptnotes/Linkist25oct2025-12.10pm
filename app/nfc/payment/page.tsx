@@ -14,7 +14,6 @@ import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import Footer from '@/components/Footer';
-import Navbar from '@/components/Navbar';
 
 // Icon aliases
 const CreditCard = CreditCardIcon;
@@ -52,6 +51,7 @@ interface OrderData {
   cardConfig: any;
   shipping: any;
   pricing: any;
+  isFoundingMember?: boolean;  // Founding member flag from checkout
 }
 
 export default function NFCPaymentPage() {
@@ -79,6 +79,11 @@ export default function NFCPaymentPage() {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [voucherType, setVoucherType] = useState<'percentage' | 'fixed'>('percentage');
+  const [voucherAmount, setVoucherAmount] = useState(0);
+
+  // Founding member status
+  const [isFoundingMember, setIsFoundingMember] = useState(false);
 
   useEffect(() => {
     // Get order data from localStorage (set by checkout page)
@@ -105,10 +110,116 @@ export default function NFCPaymentPage() {
       }
     } else {
       // If no order data, redirect back to checkout
-      console.error('❌ No pending order found in localStorage');
+      console.log('ℹ️ No pending order found, redirecting to checkout');
       router.push('/nfc/checkout');
     }
   }, [router]);
+
+  // Check if user is a founding member and auto-apply LINKISTFM
+  useEffect(() => {
+    const checkFoundingMember = async () => {
+      // First check if founding member flag exists in order data (from checkout)
+      if (orderData && typeof orderData.isFoundingMember === 'boolean') {
+        console.log('Using founding member status from order data:', orderData.isFoundingMember);
+        setIsFoundingMember(orderData.isFoundingMember);
+
+        // Auto-apply LINKISTFM for founding members if not already applied
+        if (orderData.isFoundingMember && !voucherCode) {
+          console.log('Auto-applying LINKISTFM for founding member on payment page');
+          setVoucherCode('LINKISTFM');
+
+          // Validate the voucher
+          const voucherResponse = await fetch('/api/vouchers/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: 'LINKISTFM',
+              orderAmount: orderData.pricing.total || 0,
+              userEmail: orderData.email,
+            }),
+          });
+
+          if (voucherResponse.ok) {
+            const voucherData = await voucherResponse.json();
+            if (voucherData.valid && voucherData.voucher) {
+              setVoucherType(voucherData.voucher.discount_type);
+              setVoucherAmount(voucherData.voucher.discount_amount);
+
+              // Keep voucherDiscount for percentage (for backward compatibility)
+              const discountPercent = voucherData.voucher.discount_type === 'percentage'
+                ? voucherData.voucher.discount_value
+                : Math.round((voucherData.voucher.discount_amount / (orderData.pricing.total || 1)) * 100);
+
+              setVoucherDiscount(discountPercent);
+              setVoucherValid(true);
+              console.log('Founding member discount auto-applied:', voucherData.voucher.discount_type, voucherData.voucher.discount_amount);
+            }
+          }
+        }
+        return; // Exit early, no need to call API
+      }
+
+      // Fallback: Try to check from API if not in order data
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const isFounding = data.user?.is_founding_member || false;
+          setIsFoundingMember(isFounding);
+
+          // Auto-apply LINKISTFM for founding members if not already applied
+          if (isFounding && !voucherCode && orderData) {
+            console.log('Auto-applying LINKISTFM for founding member (from API)');
+            setVoucherCode('LINKISTFM');
+
+            // Validate the voucher
+            const voucherResponse = await fetch('/api/vouchers/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: 'LINKISTFM',
+                orderAmount: orderData.pricing.total || 0,
+                userEmail: orderData.email,
+              }),
+            });
+
+            if (voucherResponse.ok) {
+              const voucherData = await voucherResponse.json();
+              if (voucherData.valid && voucherData.voucher) {
+                setVoucherType(voucherData.voucher.discount_type);
+                setVoucherAmount(voucherData.voucher.discount_amount);
+
+                // Keep voucherDiscount for percentage (for backward compatibility)
+                const discountPercent = voucherData.voucher.discount_type === 'percentage'
+                  ? voucherData.voucher.discount_value
+                  : Math.round((voucherData.voucher.discount_amount / (orderData.pricing.total || 1)) * 100);
+
+                setVoucherDiscount(discountPercent);
+                setVoucherValid(true);
+                console.log('Founding member discount auto-applied (from API):', voucherData.voucher.discount_type, voucherData.voucher.discount_amount);
+              }
+            }
+          }
+        } else if (response.status === 401) {
+          // Session expired - treat as normal user
+          console.log('Session expired - treating as normal user');
+          setIsFoundingMember(false);
+        }
+      } catch (error) {
+        // Network error - gracefully degrade to normal user
+        console.log('Could not check founding member status - treating as normal user');
+        setIsFoundingMember(false);
+      }
+    };
+
+    if (orderData) {
+      checkFoundingMember();
+    }
+  }, [orderData]);
 
   // Generate QR code when UPI QR is shown
   useEffect(() => {
@@ -206,7 +317,10 @@ export default function NFCPaymentPage() {
       const result = await response.json();
 
       if (result.valid && result.voucher) {
-        // Calculate discount percentage for display
+        setVoucherType(result.voucher.discount_type);
+        setVoucherAmount(result.voucher.discount_amount);
+
+        // Calculate discount percentage for display (for backward compatibility)
         const discountPercent = result.voucher.discount_type === 'percentage'
           ? result.voucher.discount_value
           : Math.round((result.voucher.discount_amount / (orderData?.pricing.total || 1)) * 100);
@@ -216,6 +330,8 @@ export default function NFCPaymentPage() {
       } else {
         setVoucherDiscount(0);
         setVoucherValid(false);
+        setVoucherType('percentage');
+        setVoucherAmount(0);
         alert('Invalid voucher code');
       }
     } catch (error) {
@@ -257,7 +373,9 @@ export default function NFCPaymentPage() {
     if (!orderData) return 0;
 
     const baseAmount = orderData.pricing.total;
-    const discountAmount = (baseAmount * voucherDiscount) / 100;
+    const discountAmount = voucherType === 'fixed'
+      ? voucherAmount
+      : (baseAmount * voucherDiscount) / 100;
     return Math.max(0, baseAmount - discountAmount);
   };
 
@@ -473,9 +591,8 @@ export default function NFCPaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pt-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Payment Form - Left Side */}
           <div className="lg:col-span-2 order-2 lg:order-1">
@@ -812,10 +929,13 @@ export default function NFCPaymentPage() {
                       <span>Digital Profile + Linkist App</span>
                       <span>${orderData.pricing.digitalProfilePrice?.toFixed(2) || '59.00'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>1 Year Linkist App Subscription</span>
-                      <span>${orderData.pricing.subscriptionPrice?.toFixed(2) || '120.00'}</span>
-                    </div>
+                    {/* Subscription - Hidden for Founding Members */}
+                    {!isFoundingMember && (
+                      <div className="flex justify-between">
+                        <span>1 Year Linkist App Subscription</span>
+                        <span>${orderData.pricing.subscriptionPrice?.toFixed(2) || '120.00'}</span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -829,11 +949,13 @@ export default function NFCPaymentPage() {
                       <span>${orderData.pricing.materialPrice ? (orderData.pricing.materialPrice * (orderData?.cardConfig?.quantity || 1)).toFixed(2) : '99.00'}</span>
                     </div>
 
-                    {/* App Subscription */}
-                    <div className="flex justify-between">
-                      <span>1 Year Linkist App Subscription × {orderData?.cardConfig?.quantity || 1}</span>
-                      <span>${orderData.pricing.appSubscriptionPrice ? (orderData.pricing.appSubscriptionPrice * (orderData?.cardConfig?.quantity || 1)).toFixed(2) : '120.00'}</span>
-                    </div>
+                    {/* App Subscription - Hidden for Founding Members */}
+                    {!isFoundingMember && (
+                      <div className="flex justify-between">
+                        <span>1 Year Linkist App Subscription × {orderData?.cardConfig?.quantity || 1}</span>
+                        <span>${orderData.pricing.appSubscriptionPrice ? (orderData.pricing.appSubscriptionPrice * (orderData?.cardConfig?.quantity || 1)).toFixed(2) : '120.00'}</span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between">
                       <span>Customization</span>
@@ -850,56 +972,78 @@ export default function NFCPaymentPage() {
                   <span>${orderData.pricing.taxAmount.toFixed(2)}</span>
                 </div>
 
-                {/* Voucher Section */}
-                <div className="border-t pt-2 sm:pt-3 mt-2">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                    Have a Voucher Code?
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                      placeholder="ENTER CODE"
-                      className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={validateVoucher}
-                      disabled={applyingVoucher || !voucherCode.trim()}
-                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
-                    >
-                      {applyingVoucher ? 'Applying...' : 'Apply'}
-                    </button>
+                {/* Voucher Section - Hidden for Founding Members (auto-applied) */}
+                {!isFoundingMember ? (
+                  <div className="border-t pt-2 sm:pt-3 mt-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                      Have a Voucher Code?
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE"
+                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
+                      />
+                      <button
+                        type="button"
+                        onClick={validateVoucher}
+                        disabled={applyingVoucher || !voucherCode.trim()}
+                        className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
+                      >
+                        {applyingVoucher ? 'Applying...' : 'Apply'}
+                      </button>
+                    </div>
+
+                    {voucherValid === true && (
+                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                        <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 mt-0.5" />
+                        <div className="text-xs text-green-700">
+                          <p className="font-medium">Voucher Applied!</p>
+                          <p>
+                            You get {voucherType === 'fixed' ? `flat $${voucherAmount.toFixed(2)}` : `${voucherDiscount}%`} off on your order
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {voucherValid === false && (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-600 mt-0.5" />
+                        <div className="text-xs text-red-700">
+                          <p className="font-medium">Invalid Voucher</p>
+                          <p>This voucher code is not valid or has expired</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  {voucherValid === true && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-                      <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 mt-0.5" />
-                      <div className="text-xs text-green-700">
-                        <p className="font-medium">Voucher Applied!</p>
-                        <p>You get {voucherDiscount}% off on your order</p>
+                ) : (
+                  <div className="border-t pt-2 sm:pt-3 mt-2">
+                    <div className="p-2 sm:p-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <div className="text-xs sm:text-sm">
+                          <p className="font-bold text-yellow-900">Founding Member Discount Auto-Applied!</p>
+                          <p className="text-yellow-800 mt-1">Your exclusive discount has been automatically applied to your order.</p>
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {voucherValid === false && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                      <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-600 mt-0.5" />
-                      <div className="text-xs text-red-700">
-                        <p className="font-medium">Invalid Voucher</p>
-                        <p>This voucher code is not valid or has expired</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Discount Line */}
                 {voucherDiscount > 0 && voucherValid && (
                   <div className="flex justify-between text-green-600 font-medium">
-                    <span>Voucher Discount ({voucherDiscount}% off)</span>
-                    <span>-${((orderData.pricing.total * voucherDiscount) / 100).toFixed(2)}</span>
+                    <span>
+                      Voucher Discount ({voucherType === 'fixed' ? `Flat $${voucherAmount.toFixed(2)}` : `${voucherDiscount}%`} off)
+                    </span>
+                    <span>
+                      -${voucherType === 'fixed' ? voucherAmount.toFixed(2) : ((orderData.pricing.total * voucherDiscount) / 100).toFixed(2)}
+                    </span>
                   </div>
                 )}
 

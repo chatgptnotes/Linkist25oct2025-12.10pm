@@ -43,19 +43,59 @@ export async function POST(request: NextRequest) {
     // Create Supabase client with service role key for admin operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if user already exists
-    const { data: existingUser } = await supabase
+    // Check if user already exists with this email
+    const { data: existingEmailUser } = await supabase
       .from('users')
       .select('id')
       .eq('email', normalizedEmail)
       .single();
 
-    if (existingUser) {
+    if (existingEmailUser) {
       return NextResponse.json(
         { success: false, error: 'An account with this email already exists' },
         { status: 409 }
       );
     }
+
+    // Check if user already exists with this phone number (if provided)
+    if (phone && phone.trim() !== '') {
+      const { data: existingPhoneUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('phone_number', phone)
+        .single();
+
+      if (existingPhoneUser) {
+        return NextResponse.json(
+          { success: false, error: 'An account with this phone number already exists' },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Check if user is eligible for founding member status
+    const now = new Date();
+    const { data: launchDateSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'founding_member_launch_date')
+      .single();
+
+    const { data: endDateSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'founding_member_end_date')
+      .single();
+
+    let isFoundingMember = false;
+    if (launchDateSetting && endDateSetting) {
+      const launchDate = new Date(launchDateSetting.value as string);
+      const endDate = new Date(endDateSetting.value as string);
+      isFoundingMember = now >= launchDate && now <= endDate;
+    }
+
+    // Get founding member plan from request body or localStorage (passed from founding member page)
+    const foundingMemberPlan = body.foundingMemberPlan || null;
 
     // Insert new user (no password_hash - system uses OTP-based authentication)
     const { data: newUser, error: insertError } = await supabase
@@ -68,6 +108,9 @@ export async function POST(request: NextRequest) {
         role: 'user',
         email_verified: false,
         mobile_verified: false,
+        is_founding_member: isFoundingMember,
+        founding_member_since: isFoundingMember ? now.toISOString() : null,
+        founding_member_plan: isFoundingMember && foundingMemberPlan ? foundingMemberPlan : null,
       })
       .select()
       .single();

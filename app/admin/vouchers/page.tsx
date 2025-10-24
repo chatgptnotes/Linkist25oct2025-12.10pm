@@ -438,11 +438,18 @@ export default function VouchersPage() {
                   </td>
                 </tr>
 
-                {filteredVouchers.map((voucher) => (
-                  <tr key={voucher.id} className="hover:bg-gray-50">
+                {filteredVouchers.map((voucher) => {
+                  const isFoundingMemberVoucher = voucher.code === 'LINKISTFM';
+                  return (
+                  <tr key={voucher.id} className={`hover:bg-gray-50 ${isFoundingMemberVoucher ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-yellow-500' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <span className="font-mono font-bold text-gray-900">{voucher.code}</span>
+                        {isFoundingMemberVoucher && (
+                          <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold">
+                            Founding Member
+                          </span>
+                        )}
                         <button
                           onClick={() => copyToClipboard(voucher.code)}
                           className="text-gray-400 hover:text-gray-600"
@@ -524,7 +531,8 @@ export default function VouchersPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 

@@ -235,7 +235,7 @@ export default function MapPicker({ initialAddress, onAddressChange, className =
   }
 
   return (
-    <div className={`${className} space-y-4`}>
+    <div className={`${className} space-y-4 relative z-10`}>
       {/* Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -259,7 +259,7 @@ export default function MapPicker({ initialAddress, onAddressChange, className =
       </div>
 
       {/* Map Container */}
-      <div className="relative">
+      <div className="relative isolate">
         <div className="h-96 w-full rounded-lg overflow-hidden border-2 border-gray-200">
           <MapContainer
             center={position}

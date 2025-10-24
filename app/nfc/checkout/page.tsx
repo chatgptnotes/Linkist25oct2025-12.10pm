@@ -8,7 +8,6 @@ import * as z from 'zod';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Footer from '@/components/Footer';
-import Navbar from '@/components/Navbar';
 // PIN verification removed - no longer needed
 
 // Dynamically import MapPicker to avoid SSR issues
@@ -106,6 +105,8 @@ export default function CheckoutPage() {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [autoAppliedVoucher, setAutoAppliedVoucher] = useState(false);
+  const [userIsFoundingMember, setUserIsFoundingMember] = useState(false);
 
   const {
     register,
@@ -215,6 +216,55 @@ export default function CheckoutPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-apply LINKISTFM discount for founding members
+  useEffect(() => {
+    const autoApplyFoundingDiscount = async () => {
+      // Only run once
+      if (autoAppliedVoucher) return;
+
+      try {
+        // Check if user is a founding member
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          const isFoundingMember = data.user?.is_founding_member || false;
+          setUserIsFoundingMember(isFoundingMember);
+
+          // Auto-apply LINKISTFM discount if founding member
+          if (isFoundingMember && !voucherCode) {
+            console.log('Auto-applying LINKISTFM discount for founding member');
+            setVoucherCode('LINKISTFM');
+            setAutoAppliedVoucher(true);
+
+            // Validate the voucher
+            const voucherResponse = await fetch('/api/vouchers/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: 'LINKISTFM',
+                orderAmount: 100, // Temporary value, will be recalculated
+                userEmail: data.user?.email,
+              }),
+            });
+
+            if (voucherResponse.ok) {
+              const voucherData = await voucherResponse.json();
+              if (voucherData.valid && voucherData.voucher) {
+                setVoucherDiscount(voucherData.voucher.discount_value);
+                setVoucherValid(true);
+                console.log('Founding member discount applied:', voucherData.voucher.discount_value);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-applying founding member discount:', error);
+      }
+    };
+
+    autoApplyFoundingDiscount();
+  }, [autoAppliedVoucher, voucherCode]);
 
   const calculatePricing = () => {
     // Get price based on selected material
@@ -401,11 +451,12 @@ export default function CheckoutPage() {
         throw new Error('Order was created but no ID was returned');
       }
 
-      // Store order data for payment page (including order ID)
+      // Store order data for payment page (including order ID and founding member status)
       const orderWithId = {
         ...orderPayload,
         orderId: result.order.id,
         orderNumber: result.order.orderNumber,
+        isFoundingMember: userIsFoundingMember, // Add founding member flag
       };
 
       console.log('💾 Checkout: Storing order in localStorage:', orderWithId);
@@ -517,7 +568,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      <Navbar />
 
       {/* Full-page Loading Overlay */}
       {isLoading && (
@@ -530,7 +580,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 transition-opacity duration-300 ${isLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-opacity duration-300 relative z-0 ${isLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {/* Checkout Header - Centered above everything */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Complete Your Order</h2>
@@ -878,50 +928,23 @@ export default function CheckoutPage() {
                   <span>${pricing.taxAmount.toFixed(2)}</span>
                 </div>
 
-                {/* Voucher Section */}
-                <div className="border-t pt-3 mt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Have a Voucher Code?
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                      placeholder="ENTER CODE"
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={validateVoucher}
-                      disabled={applyingVoucher || !voucherCode.trim()}
-                      className="px-4 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
-                    >
-                      {applyingVoucher ? 'Applying...' : 'Apply'}
-                    </button>
+
+                {/* Founding Member Auto-Applied Message */}
+                {userIsFoundingMember && autoAppliedVoucher && (
+                  <div className="border-t pt-3 mt-2">
+                    <div className="p-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <div className="text-sm">
+                          <p className="font-bold text-yellow-900">Founding Member Discount Applied!</p>
+                          <p className="text-yellow-800 mt-1">Your exclusive 50% discount has been automatically applied.</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-
-                  {voucherValid === true && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-                      <CheckIcon className="w-4 h-4 text-green-600 mt-0.5" />
-                      <div className="text-xs text-green-700">
-                        <p className="font-medium">Voucher Applied!</p>
-                        <p>You get {voucherDiscount}% off on your order</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {voucherValid === false && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                      <ErrorOutlineIcon className="w-4 h-4 text-red-600 mt-0.5" />
-                      <div className="text-xs text-red-700">
-                        <p className="font-medium">Invalid Voucher</p>
-                        <p>This voucher code is not valid or has expired</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {/* Discount Line */}
                 {voucherDiscount > 0 && voucherValid && (

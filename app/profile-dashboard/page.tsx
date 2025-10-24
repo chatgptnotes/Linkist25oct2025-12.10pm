@@ -52,6 +52,9 @@ interface User {
   mobile_verified: boolean;
   role: 'user' | 'admin';
   created_at: string;
+  is_founding_member?: boolean;
+  founding_member_since?: string;
+  founding_member_plan?: 'lifetime' | 'annual' | 'monthly' | null;
 }
 
 interface Order {
@@ -91,6 +94,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     checkAuthAndLoadData();
@@ -137,17 +141,78 @@ export default function AccountPage() {
       setOrders(data.data.orders);
       setStats(data.data.stats);
 
-      // Load profile data from localStorage
-      const savedProfiles = localStorage.getItem('userProfiles');
-      if (savedProfiles) {
-        try {
-          const profiles = JSON.parse(savedProfiles);
-          const userProfile = profiles.find((p: any) => p.email === userEmail);
-          if (userProfile) {
-            setProfileData(userProfile);
+      // Load profile data from database API
+      try {
+        console.log('🔍 Fetching profile data from database for:', userEmail);
+        const profileResponse = await fetch(`/api/profiles/get?email=${encodeURIComponent(userEmail)}`);
+
+        if (profileResponse.ok) {
+          const profileResult = await profileResponse.json();
+          if (profileResult.success && profileResult.profile) {
+            console.log('✅ Profile data loaded from database:', profileResult.profile);
+            setProfileData(profileResult.profile);
+          } else {
+            console.log('⚠️ No profile found in database, trying localStorage');
+            loadProfileFromLocalStorage(userEmail);
           }
-        } catch (parseError) {
-          console.error('Error parsing profile data:', parseError);
+        } else {
+          console.log('⚠️ Profile API failed, trying localStorage');
+          loadProfileFromLocalStorage(userEmail);
+        }
+      } catch (profileError) {
+        console.error('❌ Error fetching profile from database:', profileError);
+        loadProfileFromLocalStorage(userEmail);
+      }
+
+      function loadProfileFromLocalStorage(email: string) {
+        let loadedProfile = null;
+
+        // Try userProfiles array first
+        const savedProfiles = localStorage.getItem('userProfiles');
+        if (savedProfiles) {
+          try {
+            const profiles = JSON.parse(savedProfiles);
+            const userProfile = profiles.find((p: any) => p.email === email);
+            if (userProfile) {
+              loadedProfile = userProfile;
+            }
+          } catch (parseError) {
+            console.error('Error parsing userProfiles:', parseError);
+          }
+        }
+
+        // Try profileData key as fallback
+        if (!loadedProfile) {
+          const singleProfile = localStorage.getItem('profileData');
+          if (singleProfile) {
+            try {
+              loadedProfile = JSON.parse(singleProfile);
+            } catch (parseError) {
+              console.error('Error parsing profileData:', parseError);
+            }
+          }
+        }
+
+        // Try userProfile key as another fallback
+        if (!loadedProfile) {
+          const userProfileKey = localStorage.getItem('userProfile');
+          if (userProfileKey) {
+            try {
+              const parsed = JSON.parse(userProfileKey);
+              if (parsed.email === email || !loadedProfile) {
+                loadedProfile = parsed;
+              }
+            } catch (parseError) {
+              console.error('Error parsing userProfile:', parseError);
+            }
+          }
+        }
+
+        if (loadedProfile) {
+          console.log('✅ Profile data loaded from localStorage:', loadedProfile);
+          setProfileData(loadedProfile);
+        } else {
+          console.log('⚠️ No profile data found in localStorage');
         }
       }
 
@@ -282,36 +347,51 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Page Header - Below Navbar */}
-      <div className="bg-white border-b border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Profile Dashboard</h1>
-              <p className="text-sm text-gray-600 mt-0.5">Manage your digital presence and connect with your network</p>
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Profile Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2 sm:line-clamp-1">Manage your digital presence and connect with your network</p>
             </div>
-            <Link
-              href="/profiles/builder"
-              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm shadow-sm"
-            >
-              <Settings className="w-4 h-4" />
-              Edit Profile
-            </Link>
+
+            {/* Right side: Badge + Edit button */}
+            <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
+              {/* Founding Member Badge */}
+              {(user?.is_founding_member || true) && (
+                <div className="inline-flex items-center bg-gradient-to-r from-yellow-400 to-amber-500 text-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                  </svg>
+                  <span className="text-xs sm:text-sm font-bold whitespace-nowrap">Founding Member</span>
+                </div>
+              )}
+
+              <Link
+                href="/profiles/builder"
+                className="flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 bg-[#263252] text-white rounded-lg hover:bg-[#1a2339] transition-colors font-medium text-xs sm:text-sm shadow-sm"
+              >
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Edit Profile</span>
+                <span className="sm:hidden">Edit</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
         {/* Profile Completion */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Profile Completion</h2>
-            <span className="text-2xl font-bold text-red-500">{profileCompletion}%</span>
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Profile Completion</h2>
+            <span className="text-xl sm:text-2xl font-bold text-[#263252]">{profileCompletion}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
             <div
-              className="bg-red-500 h-3 rounded-full transition-all duration-500"
+              className="bg-[#263252] h-3 rounded-full transition-all duration-500"
               style={{ width: `${profileCompletion}%` }}
             ></div>
           </div>
@@ -321,7 +401,7 @@ export default function AccountPage() {
             <div className="mb-4">
               <Link
                 href="/profiles/builder"
-                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#263252] text-white rounded-lg hover:bg-[#1a2339] transition-colors font-medium text-sm"
               >
                 <Settings className="w-4 h-4" />
                 Complete Your Profile
@@ -369,12 +449,86 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {/* Profile URL Section */}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Your Profile URL</h3>
+          <div className="flex flex-col gap-3">
+            <div className="w-full">
+              <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-[#263252] rounded-lg px-3 sm:px-4 py-3 overflow-hidden">
+                <code className="text-xs sm:text-sm font-mono text-[#263252] font-semibold truncate w-full">
+                  {(() => {
+                    const isLocalhost = typeof window !== 'undefined' &&
+                      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                    const baseUrl = isLocalhost
+                      ? `${window.location.protocol}//${window.location.host}`
+                      : 'https://linkist.ai';
+
+                    const username = profileData.customUrl ||
+                                   profileData.subDomain ||
+                                   profileData.email?.split('@')[0] ||
+                                   'your-profile';
+
+                    return `${baseUrl}/${username}`;
+                  })()}
+                </code>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const isLocalhost = typeof window !== 'undefined' &&
+                  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                const baseUrl = isLocalhost
+                  ? `${window.location.protocol}//${window.location.host}`
+                  : 'https://linkist.ai';
+
+                const username = profileData.customUrl ||
+                               profileData.subDomain ||
+                               profileData.email?.split('@')[0] ||
+                               'your-profile';
+
+                const urlToCopy = `${baseUrl}/${username}`;
+
+                navigator.clipboard.writeText(urlToCopy).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }).catch(err => {
+                  console.error('Failed to copy:', err);
+                });
+              }}
+              className="w-full sm:w-auto"
+              style={{
+                backgroundColor: copied ? '#16a34a' : '#dc2626',
+                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '16px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                minHeight: '48px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = copied ? '#15803d' : '#b91c1c';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = copied ? '#16a34a' : '#dc2626';
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
         {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <br />
+        <br />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Analytics Overview */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Analytics Overview</h2>
+            <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 lg:p-8">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Analytics Overview</h2>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -432,11 +586,11 @@ export default function AccountPage() {
 
           {/* Profile Sections */}
           <div className="lg:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Profile Sections</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Profile Sections</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Personal Info Card */}
-              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
+              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-3 bg-blue-100 rounded-lg">
@@ -459,7 +613,7 @@ export default function AccountPage() {
               </Link>
 
               {/* Professional Card */}
-              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
+              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-3 bg-purple-100 rounded-lg">
@@ -482,7 +636,7 @@ export default function AccountPage() {
               </Link>
 
               {/* Social & Digital Card */}
-              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
+              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-3 bg-pink-100 rounded-lg">
@@ -505,7 +659,7 @@ export default function AccountPage() {
               </Link>
 
               {/* Profile Photo Card */}
-              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
+              <Link href="/profiles/builder" className="bg-white rounded-xl shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-3 bg-green-100 rounded-lg">
@@ -529,7 +683,7 @@ export default function AccountPage() {
 
               {/* Media Gallery Card */}
               {/* Settings Card */}
-              <Link href="/profile-dashboard/settings" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer block group">
+              <Link href="/profile-dashboard/settings" className="bg-white rounded-xl shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer block group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-3 bg-gray-100 rounded-lg">

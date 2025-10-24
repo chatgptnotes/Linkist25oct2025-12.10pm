@@ -162,6 +162,9 @@ export interface Database {
           phone_number: string | null
           email_verified: boolean
           mobile_verified: boolean
+          is_founding_member: boolean
+          founding_member_since: string | null
+          founding_member_plan: 'lifetime' | 'annual' | 'monthly' | null
           created_at: string
           updated_at: string
         }
@@ -173,6 +176,9 @@ export interface Database {
           phone_number?: string | null
           email_verified?: boolean
           mobile_verified?: boolean
+          is_founding_member?: boolean
+          founding_member_since?: string | null
+          founding_member_plan?: 'lifetime' | 'annual' | 'monthly' | null
           created_at?: string
           updated_at?: string
         }
@@ -184,6 +190,9 @@ export interface Database {
           phone_number?: string | null
           email_verified?: boolean
           mobile_verified?: boolean
+          is_founding_member?: boolean
+          founding_member_since?: string | null
+          founding_member_plan?: 'lifetime' | 'annual' | 'monthly' | null
           created_at?: string
           updated_at?: string
         }

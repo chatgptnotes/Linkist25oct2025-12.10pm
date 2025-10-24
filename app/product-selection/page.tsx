@@ -386,13 +386,13 @@ export default function ProductSelectionPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-12 flex-grow">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 flex-grow">
         {/* Title Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-8 md:mb-12">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 px-4">
             Choose Your Linkist Experience
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto px-4">
             Select the perfect plan for your professional networking needs
           </p>
 
@@ -407,7 +407,7 @@ export default function ProductSelectionPage() {
         </div>
 
         {/* Product Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-6 mb-6">
           {plansLoading ? (
             // Loading skeleton
             [1, 2, 3].map((i) => (
@@ -431,7 +431,7 @@ export default function ProductSelectionPage() {
               onClick={() => !option.disabled && handleCardClick(option.id)}
               className={`relative rounded-2xl border-2 transition-all ${
                 selectedProduct === option.id
-                  ? 'border-red-600 shadow-2xl scale-105 ring-2 ring-red-600 ring-offset-4 cursor-pointer'
+                  ? 'border-[#263252] shadow-lg scale-[1.02] ring-1 ring-[#263252] ring-offset-2 md:shadow-2xl md:scale-105 md:ring-2 md:ring-offset-4 cursor-pointer'
                   : option.disabled
                   ? 'border-gray-200 opacity-60 cursor-not-allowed'
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-lg cursor-pointer'
@@ -439,8 +439,8 @@ export default function ProductSelectionPage() {
             >
               {/* Popular Badge */}
               {option.popular && !option.disabled && (
-                <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-20">
-                  <span className="bg-red-600 text-white px-4 py-1 rounded-full text-xs font-semibold shadow-lg">
+                <div className="absolute -top-4 md:-top-5 left-1/2 transform -translate-x-1/2 z-20">
+                  <span className="bg-red-600 text-white px-3 py-1 md:px-4 rounded-full text-[10px] md:text-xs font-semibold shadow-lg whitespace-nowrap">
                     MOST POPULAR
                   </span>
                 </div>
@@ -457,38 +457,36 @@ export default function ProductSelectionPage() {
                 </div>
               )}
 
-              <div className={`${option.popular && !option.disabled ? 'pt-6 px-4 pb-4' : 'p-4'}`}>
+              <div className={`${option.popular && !option.disabled ? 'pt-6 px-5 pb-5 md:px-4 md:pb-4' : 'p-5 md:p-4'}`}>
                 {/* Icon */}
-                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full mb-3 ${
-                  option.popular && !option.disabled ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
-                }`}>
+                <div className="inline-flex items-center justify-center w-14 h-14 md:w-12 md:h-12 rounded-full mb-4 bg-[#263252] text-white">
                   {option.icon}
                 </div>
 
                 {/* Title & Subtitle */}
-                <h3 className="text-base font-bold text-gray-900 mb-1">
+                <h3 className="text-lg md:text-base font-bold text-gray-900 mb-2 md:mb-1">
                   {option.title}
                 </h3>
-                <p className="text-xs text-gray-600 mb-3">
+                <p className="text-sm md:text-xs text-gray-600 mb-4 md:mb-3">
                   {option.subtitle}
                 </p>
 
                 {/* Price */}
-                <div className="mb-3">
-                  <p className="text-xl font-bold text-gray-900">
+                <div className="mb-4 md:mb-3">
+                  <p className="text-2xl md:text-xl font-bold text-gray-900">
                     {option.price}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-sm md:text-xs text-gray-500 mt-1 md:mt-0.5">
                     {option.priceLabel}
                   </p>
                 </div>
 
                 {/* Features */}
-                <ul className="space-y-1.5">
+                <ul className="space-y-2 md:space-y-1.5">
                   {option.features.map((feature, index) => (
                     <li key={index} className="flex items-start">
-                      <Check className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-xs text-gray-700">{feature}</span>
+                      <Check className="w-5 h-5 md:w-4 md:h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm md:text-xs text-gray-700">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -499,10 +497,10 @@ export default function ProductSelectionPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-6 flex items-center justify-center gap-4 min-h-[52px] -ml-8">
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 min-h-[52px]">
           <button
             onClick={() => router.back()}
-            className="px-6 py-3 text-gray-600 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+            className="w-full sm:w-auto px-6 py-3 text-gray-600 hover:text-gray-900 font-medium transition-colors cursor-pointer text-center"
           >
             ← Go Back
           </button>
@@ -510,7 +508,7 @@ export default function ProductSelectionPage() {
           <button
             onClick={handleConfirmSelection}
             disabled={loading || !selectedProduct}
-            className={`px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer disabled:cursor-not-allowed ${
+            className={`w-full sm:w-auto px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer disabled:cursor-not-allowed ${
               selectedProduct
                 ? 'shadow-lg hover:shadow-xl opacity-100'
                 : 'opacity-0 pointer-events-none'

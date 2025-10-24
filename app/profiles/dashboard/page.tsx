@@ -141,6 +141,27 @@ export default function ProfileDashboard() {
     );
   }
 
+  // Check founding member status
+  const [isFoundingMember, setIsFoundingMember] = useState(false);
+  const [foundingMemberPlan, setFoundingMemberPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check founding member status from user data
+    const checkFoundingMember = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          setIsFoundingMember(data.user?.is_founding_member || false);
+          setFoundingMemberPlan(data.user?.founding_member_plan || null);
+        }
+      } catch (error) {
+        console.error('Error checking founding member status:', error);
+      }
+    };
+    checkFoundingMember();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -148,15 +169,28 @@ export default function ProfileDashboard() {
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Profile Dashboard</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900">Profile Dashboard</h1>
+                {isFoundingMember && (
+                  <div className="flex items-center bg-gradient-to-r from-yellow-400 to-amber-500 text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    Founding Member
+                    {foundingMemberPlan && (
+                      <span className="ml-2 text-xs opacity-80">({foundingMemberPlan})</span>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="text-gray-600 mt-2">Manage and track your digital profiles</p>
             </div>
             <Link
               href="/profiles/templates"
-              className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition flex items-center"
+              className="bg-[#263252] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#1a2339] transition flex items-center"
             >
-              <Plus className="h-5 w-5 mr-2" />
-              Create New Profile
+              <Plus className="h-5 w-5 md:mr-2" />
+              <span className="hidden md:inline">Create New Profile</span>
             </Link>
           </div>
         </div>
