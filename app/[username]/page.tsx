@@ -129,7 +129,7 @@ export default function ProfilePreviewPage() {
             companyName: dbProfile.company || '',
             companyWebsite: dbProfile.website || '',
             companyAddress: dbProfile.location || '',
-            companyLogo: null,
+            companyLogo: dbProfile.companyLogo || null,
             industry: dbProfile.industry || '',
             subDomain: '',
             skills: dbProfile.skills || [],

@@ -56,6 +56,7 @@ export async function GET(
       bio: profile.professional_summary || '',
       profileImage: profile.profile_photo_url || profile.avatar_url || '',
       coverImage: profile.background_image_url || '',
+      companyLogo: profile.company_logo_url || '',
       email: profile.primary_email || profile.email || '',
       phone: profile.mobile_number || profile.phone_number || '',
       website: profile.company_website || '',
