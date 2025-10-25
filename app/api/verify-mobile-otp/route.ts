@@ -47,43 +47,63 @@ export async function POST(request: NextRequest) {
         if (verificationCheck.status === 'approved') {
           // Update user's mobile_verified status in database
           const supabase = createClient(supabaseUrl, supabaseServiceKey);
-          const userEmail = request.cookies.get('userEmail')?.value;
+          let userEmail = request.cookies.get('userEmail')?.value;
+          let user = null;
 
+          // Try to find user by email from cookie first
           if (userEmail) {
-            await supabase
-              .from('users')
-              .update({ mobile_verified: true, phone_number: mobile })
-              .eq('email', userEmail);
-
-            // Fetch user data to create session
-            const { data: user, error: userError } = await supabase
+            const { data: userData, error: emailError } = await supabase
               .from('users')
               .select('id, email, role')
               .eq('email', userEmail)
               .single();
 
-            if (user && !userError) {
-              // Create session
-              const sessionId = await SessionStore.create(user.id, user.email, user.role || 'user');
-              console.log('✅ Session created after mobile verification (Twilio):', sessionId);
-
-              // Set session cookie
-              const response = NextResponse.json({
-                success: true,
-                message: 'Mobile number verified successfully',
-                verified: true
-              });
-
-              response.cookies.set('session', sessionId, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 60 * 60 * 24 * 7, // 7 days
-                path: '/'
-              });
-
-              return response;
+            if (userData && !emailError) {
+              user = userData;
             }
+          }
+
+          // Fallback: Look up user by phone number if cookie method failed
+          if (!user) {
+            const { data: userData, error: phoneError } = await supabase
+              .from('users')
+              .select('id, email, role')
+              .eq('phone_number', mobile)
+              .single();
+
+            if (userData && !phoneError) {
+              user = userData;
+              userEmail = userData.email;
+            }
+          }
+
+          if (user) {
+            // Update mobile_verified status
+            await supabase
+              .from('users')
+              .update({ mobile_verified: true, phone_number: mobile })
+              .eq('id', user.id);
+
+            // Create session
+            const sessionId = await SessionStore.create(user.id, user.email, user.role || 'user');
+            console.log('✅ Session created after mobile verification (Twilio):', sessionId);
+
+            // Set session cookie
+            const response = NextResponse.json({
+              success: true,
+              message: 'Mobile number verified successfully',
+              verified: true
+            });
+
+            response.cookies.set('session', sessionId, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 7, // 7 days
+              path: '/'
+            });
+
+            return response;
           }
 
           return NextResponse.json({
@@ -163,43 +183,63 @@ export async function POST(request: NextRequest) {
 
     // Update user's mobile_verified status in database
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const userEmail = request.cookies.get('userEmail')?.value;
+    let userEmail = request.cookies.get('userEmail')?.value;
+    let user = null;
 
+    // Try to find user by email from cookie first
     if (userEmail) {
-      await supabase
-        .from('users')
-        .update({ mobile_verified: true, phone_number: mobile })
-        .eq('email', userEmail);
-
-      // Fetch user data to create session
-      const { data: user, error: userError } = await supabase
+      const { data: userData, error: emailError } = await supabase
         .from('users')
         .select('id, email, role')
         .eq('email', userEmail)
         .single();
 
-      if (user && !userError) {
-        // Create session
-        const sessionId = await SessionStore.create(user.id, user.email, user.role || 'user');
-        console.log('✅ Session created after mobile verification:', sessionId);
-
-        // Set session cookie
-        const response = NextResponse.json({
-          success: true,
-          message: 'Mobile number verified successfully',
-          verified: true
-        });
-
-        response.cookies.set('session', sessionId, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-          path: '/'
-        });
-
-        return response;
+      if (userData && !emailError) {
+        user = userData;
       }
+    }
+
+    // Fallback: Look up user by phone number if cookie method failed
+    if (!user) {
+      const { data: userData, error: phoneError } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .eq('phone_number', mobile)
+        .single();
+
+      if (userData && !phoneError) {
+        user = userData;
+        userEmail = userData.email;
+      }
+    }
+
+    if (user) {
+      // Update mobile_verified status
+      await supabase
+        .from('users')
+        .update({ mobile_verified: true, phone_number: mobile })
+        .eq('id', user.id);
+
+      // Create session
+      const sessionId = await SessionStore.create(user.id, user.email, user.role || 'user');
+      console.log('✅ Session created after mobile verification:', sessionId);
+
+      // Set session cookie
+      const response = NextResponse.json({
+        success: true,
+        message: 'Mobile number verified successfully',
+        verified: true
+      });
+
+      response.cookies.set('session', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/'
+      });
+
+      return response;
     }
 
     return NextResponse.json({

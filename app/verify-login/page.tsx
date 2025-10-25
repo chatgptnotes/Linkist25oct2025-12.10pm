@@ -92,7 +92,7 @@ export default function VerifyLoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(isPhone ? { mobile: email, otp } : { email, otp }),
+        body: JSON.stringify(isPhone ? { mobile: email, otp } : { email: email.toLowerCase(), otp }),
       });
 
       const data = await response.json();

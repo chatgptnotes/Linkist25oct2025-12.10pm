@@ -82,14 +82,26 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // If all Twilio attempts failed, try database fallback
+        // If all Twilio attempts failed, try database fallback with all phone formats
         if (!twilioSuccess) {
           console.log('⚠️ [verify-otp] All Twilio formats failed, falling back to database verification');
           console.log('⚠️ [verify-otp] Last Twilio error:', lastTwilioError?.message);
 
-          const storedRecord = await SupabaseMobileOTPStore.get(phoneToVerify);
+          let storedRecord = null;
+          let matchedFormat = null;
+
+          // Try all phone formats to find the OTP
+          for (const phoneFormat of phoneFormats) {
+            storedRecord = await SupabaseMobileOTPStore.get(phoneFormat);
+            if (storedRecord) {
+              matchedFormat = phoneFormat;
+              console.log('✅ [verify-otp] Found OTP in database with phone format:', phoneFormat);
+              break;
+            }
+          }
 
           if (!storedRecord) {
+            console.error('❌ [verify-otp] No OTP found for any phone format. Tried:', phoneFormats);
             return NextResponse.json(
               { error: 'No verification code found. Please request a new code.' },
               { status: 400 }
@@ -97,7 +109,7 @@ export async function POST(request: NextRequest) {
           }
 
           if (new Date() > new Date(storedRecord.expires_at)) {
-            await SupabaseMobileOTPStore.delete(identifier);
+            await SupabaseMobileOTPStore.delete(matchedFormat!);
             return NextResponse.json(
               { error: 'Verification code has expired. Please request a new code.' },
               { status: 400 }
@@ -112,20 +124,34 @@ export async function POST(request: NextRequest) {
           }
 
           // Mark as verified
-          await SupabaseMobileOTPStore.set(identifier, {
+          await SupabaseMobileOTPStore.set(matchedFormat!, {
             ...storedRecord,
             verified: true
           });
 
           // Clean up
-          await SupabaseMobileOTPStore.delete(identifier);
+          await SupabaseMobileOTPStore.delete(matchedFormat!);
+          phoneToVerify = matchedFormat!; // Use the format that matched
         }
       } else {
-        // No Twilio, use database verification
-        console.log('📱 [verify-otp] Verifying from database');
-        const storedRecord = await SupabaseMobileOTPStore.get(identifier);
+        // No Twilio, use database verification - try all phone formats
+        console.log('📱 [verify-otp] Verifying from database, trying all phone formats');
+
+        let storedRecord = null;
+        let matchedFormat = null;
+
+        // Try all phone formats to find the OTP
+        for (const phoneFormat of phoneFormats) {
+          storedRecord = await SupabaseMobileOTPStore.get(phoneFormat);
+          if (storedRecord) {
+            matchedFormat = phoneFormat;
+            console.log('✅ [verify-otp] Found OTP in database with phone format:', phoneFormat);
+            break;
+          }
+        }
 
         if (!storedRecord) {
+          console.error('❌ [verify-otp] No OTP found for any phone format. Tried:', phoneFormats);
           return NextResponse.json(
             { error: 'No verification code found. Please request a new code.' },
             { status: 400 }
@@ -133,7 +159,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (new Date() > new Date(storedRecord.expires_at)) {
-          await SupabaseMobileOTPStore.delete(identifier);
+          await SupabaseMobileOTPStore.delete(matchedFormat!);
           return NextResponse.json(
             { error: 'Verification code has expired. Please request a new code.' },
             { status: 400 }
@@ -148,13 +174,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Mark as verified
-        await SupabaseMobileOTPStore.set(identifier, {
+        await SupabaseMobileOTPStore.set(matchedFormat!, {
           ...storedRecord,
           verified: true
         });
 
         // Clean up
-        await SupabaseMobileOTPStore.delete(identifier);
+        await SupabaseMobileOTPStore.delete(matchedFormat!);
+        phoneToVerify = matchedFormat!; // Use the format that matched
       }
 
       console.log('✅ [verify-otp] Phone OTP verified successfully');
@@ -213,7 +240,8 @@ export async function POST(request: NextRequest) {
     // ==================== EMAIL OTP VERIFICATION ====================
     if (isEmail) {
       console.log('📧 [verify-otp] Verifying email OTP');
-      const storedRecord = await SupabaseEmailOTPStore.get(identifier);
+      const normalizedIdentifier = identifier.toLowerCase();
+      const storedRecord = await SupabaseEmailOTPStore.get(normalizedIdentifier);
 
       if (!storedRecord) {
         return NextResponse.json(
@@ -223,7 +251,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (new Date() > new Date(storedRecord.expires_at)) {
-        await SupabaseEmailOTPStore.delete(identifier);
+        await SupabaseEmailOTPStore.delete(normalizedIdentifier);
         return NextResponse.json(
           { error: 'Verification code has expired. Please request a new code.' },
           { status: 400 }
@@ -240,25 +268,25 @@ export async function POST(request: NextRequest) {
       console.log('✅ [verify-otp] Email OTP verified successfully');
 
       // Mark as verified
-      await SupabaseEmailOTPStore.set(identifier, {
+      await SupabaseEmailOTPStore.set(normalizedIdentifier, {
         ...storedRecord,
         verified: true
       });
 
       // Get user from database or create if this is a new registration
-      user = await SupabaseUserStore.getByEmail(identifier);
+      user = await SupabaseUserStore.getByEmail(normalizedIdentifier);
 
       if (!user) {
-        console.log('👤 [verify-otp] User not found, checking if this is new registration for:', identifier);
+        console.log('👤 [verify-otp] User not found, checking if this is new registration for:', normalizedIdentifier);
 
         // Check if this OTP record has user registration data
         if (storedRecord.user_data) {
-          console.log('🆕 [verify-otp] Creating new user account for:', identifier);
+          console.log('🆕 [verify-otp] Creating new user account for:', normalizedIdentifier);
 
           try {
             // Create the user account now that OTP is verified
             user = await SupabaseUserStore.upsertByEmail({
-              email: identifier,
+              email: normalizedIdentifier,
               first_name: storedRecord.user_data.firstName,
               last_name: storedRecord.user_data.lastName,
               phone_number: storedRecord.user_data.phone || null,
@@ -276,7 +304,7 @@ export async function POST(request: NextRequest) {
             );
           }
         } else {
-          console.error('❌ [verify-otp] User not found and no registration data available for:', identifier);
+          console.error('❌ [verify-otp] User not found and no registration data available for:', normalizedIdentifier);
           return NextResponse.json(
             { error: 'User account not found. Please register first.' },
             { status: 404 }
@@ -285,10 +313,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Update email verification status
-      await SupabaseUserStore.updateVerificationStatus(identifier, 'email', true);
+      await SupabaseUserStore.updateVerificationStatus(normalizedIdentifier, 'email', true);
 
       // Clean up
-      await SupabaseEmailOTPStore.delete(identifier);
+      await SupabaseEmailOTPStore.delete(normalizedIdentifier);
     }
 
     // ==================== CREATE SESSION ====================

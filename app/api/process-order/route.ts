@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
 
     const { cardConfig, checkoutData, paymentData, orderId, pricing } = body;
 
+    console.log('🔍 [process-order] Received data:', {
+      cardConfig,
+      checkoutData,
+      paymentData: paymentData ? 'present' : 'null',
+      orderId,
+      pricing
+    });
+
     if (!cardConfig || !checkoutData) {
       console.error('❌ [process-order] Missing required data:', {
         cardConfig: !!cardConfig,
@@ -64,21 +72,27 @@ export async function POST(request: NextRequest) {
     // Create/update user in database
     console.log('👤 [process-order] Creating/updating user in database...');
 
-    const user = await SupabaseUserStore.upsertByEmail({
-      email: checkoutData.email,
-      first_name: checkoutData.fullName?.split(' ')[0] || cardConfig.firstName,
-      last_name: checkoutData.fullName?.split(' ').slice(1).join(' ') || cardConfig.lastName,
-      phone_number: checkoutData.phoneNumber || null,
-      email_verified: true, // They completed checkout, so email is verified
-      mobile_verified: !!checkoutData.phoneNumber, // If they provided phone, assume verified
-    });
+    let user;
+    try {
+      user = await SupabaseUserStore.upsertByEmail({
+        email: checkoutData.email,
+        first_name: checkoutData.fullName?.split(' ')[0] || cardConfig.firstName,
+        last_name: checkoutData.fullName?.split(' ').slice(1).join(' ') || cardConfig.lastName,
+        phone_number: checkoutData.phoneNumber || null,
+        email_verified: true, // They completed checkout, so email is verified
+        mobile_verified: !!checkoutData.phoneNumber, // If they provided phone, assume verified
+      });
 
-    console.log('✅ [process-order] User created/updated:', {
-      userId: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name
-    });
+      console.log('✅ [process-order] User created/updated:', {
+        userId: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name
+      });
+    } catch (userError) {
+      console.error('❌ [process-order] Error creating/updating user:', userError);
+      throw new Error(`User creation failed: ${userError instanceof Error ? userError.message : 'Unknown error'}`);
+    }
 
     // Determine order status - 'pending' if called from checkout, 'confirmed' if has payment
     const orderStatus = paymentData ? 'confirmed' : 'pending';
@@ -146,48 +160,51 @@ export async function POST(request: NextRequest) {
     } else {
       // Create new order
       console.log(`📝 [process-order] Creating new order in database with status: ${orderStatus}...`);
-      order = await SupabaseOrderStore.create({
-        orderNumber: await generateOrderNumber(),
-        userId: user.id, // Link order to user
-        status: orderStatus,
-        customerName: checkoutData.fullName,
-        email: checkoutData.email,
-        phoneNumber: checkoutData.phoneNumber || '',
-        cardConfig: cardConfig,
-        pricing: {
-          subtotal,
-          shipping: shippingAmount,
-          tax: taxAmount,
-          total: totalAmount,
-        },
-        shipping: {
-          fullName: checkoutData.fullName,
-          addressLine1: checkoutData.addressLine1,
-          addressLine2: checkoutData.addressLine2,
-          city: checkoutData.city,
-          state: checkoutData.state,
-          country: checkoutData.country,
-          postalCode: checkoutData.postalCode,
+
+      try {
+        order = await SupabaseOrderStore.create({
+          orderNumber: await generateOrderNumber(),
+          userId: user.id, // Link order to user
+          status: orderStatus,
+          customerName: checkoutData.fullName,
+          email: checkoutData.email,
           phoneNumber: checkoutData.phoneNumber || '',
-        },
-        estimatedDelivery: 'Sep 06, 2025',
-        emailsSent: {},
-      });
+          cardConfig: cardConfig,
+          pricing: {
+            subtotal,
+            shipping: shippingAmount,
+            tax: taxAmount,
+            total: totalAmount,
+          },
+          shipping: {
+            fullName: checkoutData.fullName,
+            addressLine1: checkoutData.addressLine1,
+            addressLine2: checkoutData.addressLine2,
+            city: checkoutData.city,
+            state: checkoutData.state,
+            country: checkoutData.country,
+            postalCode: checkoutData.postalCode,
+            phoneNumber: checkoutData.phoneNumber || '',
+          },
+          estimatedDelivery: 'Sep 06, 2025',
+          emailsSent: {},
+        });
 
-      if (!order) {
-        console.error('❌ [process-order] Failed to create order in database');
-        return NextResponse.json(
-          { error: 'Failed to create order' },
-          { status: 500 }
-        );
+        if (!order) {
+          console.error('❌ [process-order] Failed to create order in database - returned null');
+          throw new Error('Order creation returned null');
+        }
+
+        console.log('✅ [process-order] Order created successfully:', {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerEmail: order.email,
+          status: order.status
+        });
+      } catch (orderError) {
+        console.error('❌ [process-order] Error creating order:', orderError);
+        throw new Error(`Order creation failed: ${orderError instanceof Error ? orderError.message : 'Unknown error'}`);
       }
-
-      console.log('✅ [process-order] Order created successfully:', {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        customerEmail: order.email,
-        status: order.status
-      });
     }
 
     // Create payment record if payment data provided
@@ -361,8 +378,15 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
       fullError: error
     });
+
+    // Return more detailed error message in development
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process order';
+    const detailedError = process.env.NODE_ENV === 'development'
+      ? { error: errorMessage, details: error instanceof Error ? error.stack : String(error) }
+      : { error: 'Failed to process order' };
+
     return NextResponse.json(
-      { error: 'Failed to process order' },
+      detailedError,
       { status: 500 }
     );
   }

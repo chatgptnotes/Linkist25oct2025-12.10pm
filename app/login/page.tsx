@@ -92,7 +92,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        showToast('Verification code sent to your email!', 'success');
+        showToast('Verification code sent!', 'success');
         // Store email/phone and return URL for verification
         localStorage.setItem('loginIdentifier', identifier);
         localStorage.setItem('returnUrl', returnUrl);

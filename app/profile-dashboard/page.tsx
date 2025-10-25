@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getBaseUrl } from '@/lib/get-base-url';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -457,16 +458,21 @@ export default function AccountPage() {
               <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-[#263252] rounded-lg px-3 sm:px-4 py-3 overflow-hidden">
                 <code className="text-xs sm:text-sm font-mono text-[#263252] font-semibold truncate w-full">
                   {(() => {
-                    const isLocalhost = typeof window !== 'undefined' &&
-                      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-                    const baseUrl = isLocalhost
-                      ? `${window.location.protocol}//${window.location.host}`
-                      : 'https://linkist.ai';
+                    const baseUrl = getBaseUrl();
 
-                    const username = profileData.customUrl ||
-                                   profileData.subDomain ||
-                                   profileData.email?.split('@')[0] ||
-                                   'your-profile';
+                    // Generate username from custom_url or firstname-lastname format
+                    let username = 'your-profile';
+
+                    if (profileData?.customUrl) {
+                      // Use custom_url from database
+                      username = profileData.customUrl;
+                    } else if (user?.first_name && user?.last_name) {
+                      // Generate from firstname-lastname
+                      username = `${user.first_name}-${user.last_name}`.toLowerCase().replace(/\s+/g, '-');
+                    } else if (profileData?.email) {
+                      // Fallback to email username
+                      username = profileData.email.split('@')[0];
+                    }
 
                     return `${baseUrl}/${username}`;
                   })()}
@@ -476,25 +482,76 @@ export default function AccountPage() {
             <button
               type="button"
               onClick={() => {
-                const isLocalhost = typeof window !== 'undefined' &&
-                  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-                const baseUrl = isLocalhost
-                  ? `${window.location.protocol}//${window.location.host}`
-                  : 'https://linkist.ai';
+                const baseUrl = getBaseUrl();
 
-                const username = profileData.customUrl ||
-                               profileData.subDomain ||
-                               profileData.email?.split('@')[0] ||
-                               'your-profile';
+                // Generate username from custom_url or firstname-lastname format
+                let username = 'your-profile';
+
+                if (profileData?.customUrl) {
+                  // Use custom_url from database
+                  username = profileData.customUrl;
+                } else if (user?.first_name && user?.last_name) {
+                  // Generate from firstname-lastname
+                  username = `${user.first_name}-${user.last_name}`.toLowerCase().replace(/\s+/g, '-');
+                } else if (profileData?.email) {
+                  // Fallback to email username
+                  username = profileData.email.split('@')[0];
+                }
 
                 const urlToCopy = `${baseUrl}/${username}`;
 
-                navigator.clipboard.writeText(urlToCopy).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }).catch(err => {
-                  console.error('Failed to copy:', err);
-                });
+                // Mobile-compatible copy function with fallback
+                const copyToClipboard = (text: string) => {
+                  // Method 1: Try modern Clipboard API (works on HTTPS/localhost)
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }).catch(() => {
+                      // Fallback if clipboard API fails
+                      fallbackCopy(text);
+                    });
+                  } else {
+                    // Method 2: Fallback for mobile/non-HTTPS
+                    fallbackCopy(text);
+                  }
+                };
+
+                // Fallback copy method that works on mobile
+                const fallbackCopy = (text: string) => {
+                  try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    textArea.style.position = 'fixed';
+                    textArea.style.top = '0';
+                    textArea.style.left = '0';
+                    textArea.style.width = '2em';
+                    textArea.style.height = '2em';
+                    textArea.style.padding = '0';
+                    textArea.style.border = 'none';
+                    textArea.style.outline = 'none';
+                    textArea.style.boxShadow = 'none';
+                    textArea.style.background = 'transparent';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+
+                    if (successful) {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    } else {
+                      alert('Copy failed. Please copy manually: ' + text);
+                    }
+                  } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    alert('Copy failed. Please copy manually: ' + text);
+                  }
+                };
+
+                copyToClipboard(urlToCopy);
               }}
               className="w-full sm:w-auto"
               style={{

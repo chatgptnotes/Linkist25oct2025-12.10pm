@@ -101,6 +101,23 @@ export const SupabaseUserStore = {
         details: error.details,
         hint: error.hint,
       })
+
+      // If duplicate phone number error, try to find user by phone
+      if (error.code === '23505' && error.message.includes('idx_users_phone_unique') && input.phone_number) {
+        console.log('👤 [SupabaseUserStore.upsertByEmail] Duplicate phone detected, looking up by phone:', input.phone_number)
+
+        const { data: userByPhone, error: phoneError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('phone_number', input.phone_number)
+          .single()
+
+        if (userByPhone && !phoneError) {
+          console.log('✅ [SupabaseUserStore.upsertByEmail] Found existing user by phone:', userByPhone.id)
+          return userByPhone
+        }
+      }
+
       throw new Error(`Failed to create user: ${error.message}`)
     }
 
@@ -117,7 +134,7 @@ export const SupabaseUserStore = {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .eq('email', email.toLowerCase())
       .single()
 
     if (error) {

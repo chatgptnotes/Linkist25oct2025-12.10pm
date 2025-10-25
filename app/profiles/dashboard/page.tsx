@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getBaseDomain } from '@/lib/get-base-url';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -75,7 +76,7 @@ export default function ProfileDashboard() {
             clicks: 342,
             shares: 89,
             lastUpdated: '2 hours ago',
-            publicUrl: 'linkist.ai/johndoe'
+            publicUrl: `${getBaseDomain()}/johndoe`
           },
           {
             id: '2',
@@ -87,7 +88,7 @@ export default function ProfileDashboard() {
             clicks: 123,
             shares: 34,
             lastUpdated: '1 day ago',
-            publicUrl: 'linkist.ai/janesmith'
+            publicUrl: `${getBaseDomain()}/janesmith`
           }
         ]);
       }

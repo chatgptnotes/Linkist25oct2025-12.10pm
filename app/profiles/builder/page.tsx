@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
+import { getBaseDomain } from '@/lib/get-base-url';
 
 const MapPickerSimple = dynamic(() => import('@/components/MapPickerSimple'), {
   ssr: false,
@@ -1065,7 +1066,7 @@ function ProfileBuilderContent() {
           clicks: 0,
           shares: 0,
           lastUpdated: 'Just now',
-          publicUrl: `linkist.ai/${profileData.firstName.toLowerCase()}${profileData.lastName.toLowerCase()}`
+          publicUrl: `${getBaseDomain()}/${profileData.firstName.toLowerCase()}${profileData.lastName.toLowerCase()}`
         };
 
         // Check if profile already exists (for editing)

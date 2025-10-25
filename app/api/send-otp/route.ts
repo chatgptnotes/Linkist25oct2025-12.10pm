@@ -343,8 +343,9 @@ export async function POST(request: NextRequest) {
     let userPhone = '';
 
     if (isEmail) {
-      user = await SupabaseUserStore.getByEmail(emailOrPhone);
-      userEmail = emailOrPhone;
+      const normalizedEmail = emailOrPhone.toLowerCase();
+      user = await SupabaseUserStore.getByEmail(normalizedEmail);
+      userEmail = normalizedEmail;
     } else if (isPhone) {
       // Clean phone number (remove spaces, dashes, parentheses)
       const cleanPhone = emailOrPhone.replace(/[\s-()]/g, '');

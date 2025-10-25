@@ -428,7 +428,7 @@ export default function CheckoutPage() {
             addressLine1: orderPayload.shipping.addressLine1,
             addressLine2: orderPayload.shipping.addressLine2,
             city: orderPayload.shipping.city,
-            stateProvince: orderPayload.shipping.stateProvince,
+            state: orderPayload.shipping.stateProvince,
             country: orderPayload.shipping.country,
             postalCode: orderPayload.shipping.postalCode,
           },

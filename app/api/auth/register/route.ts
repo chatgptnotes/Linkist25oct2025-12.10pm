@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
       // User can still login and profile will be created later
     }
 
-    // Return success with user data
-    return NextResponse.json({
+    // Return success with user data and set userEmail cookie for OTP verification
+    const response = NextResponse.json({
       success: true,
       message: 'Account created successfully',
       user: {
@@ -163,6 +163,17 @@ export async function POST(request: NextRequest) {
         role: newUser.role,
       }
     });
+
+    // Set userEmail cookie for OTP verification to enable auto-login
+    response.cookies.set('userEmail', newUser.email, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 30, // 30 minutes (enough time to verify OTP)
+      path: '/'
+    });
+
+    return response;
 
   } catch (error) {
     console.error('❌ Registration error:', error);
