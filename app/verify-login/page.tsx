@@ -47,35 +47,40 @@ export default function VerifyLoginPage() {
       // Store it for the verification process
       localStorage.setItem('loginEmail', emailParam);
     } else {
-      // Try to get email from user profile (from onboarding)
-      const userProfile = localStorage.getItem('userProfile');
-      let emailToUse = '';
+      // Priority order: loginIdentifier (current login) > userProfile (onboarding)
+      let identifierToUse = '';
 
-      if (userProfile) {
-        try {
-          const profile = JSON.parse(userProfile);
-          if (profile.email) {
-            emailToUse = profile.email;
+      // 1. Check loginIdentifier FIRST (current login attempt)
+      const loginIdentifier = localStorage.getItem('loginIdentifier');
+      if (loginIdentifier) {
+        identifierToUse = loginIdentifier;
+        console.log('✅ Using login identifier:', identifierToUse);
+      }
+
+      // 2. Fallback to userProfile ONLY if no loginIdentifier (onboarding flow)
+      if (!identifierToUse) {
+        const userProfile = localStorage.getItem('userProfile');
+        if (userProfile) {
+          try {
+            const profile = JSON.parse(userProfile);
+            if (profile.email) {
+              identifierToUse = profile.email;
+              console.log('✅ Using profile email:', identifierToUse);
+            }
+          } catch (error) {
+            console.error('Error parsing user profile:', error);
           }
-        } catch (error) {
-          console.error('Error parsing user profile:', error);
         }
       }
 
-      // Fallback to loginIdentifier if no profile email
-      if (!emailToUse) {
-        const loginIdentifier = localStorage.getItem('loginIdentifier');
-        if (loginIdentifier) {
-          emailToUse = loginIdentifier;
-        }
-      }
-
-      if (emailToUse) {
-        setEmail(emailToUse);
+      if (identifierToUse) {
+        setEmail(identifierToUse);
         // Detect if it's a phone number (no @ symbol)
-        setIsPhone(!emailToUse.includes('@'));
+        setIsPhone(!identifierToUse.includes('@'));
+        console.log('📱 Input type detected:', !identifierToUse.includes('@') ? 'Phone' : 'Email');
       } else {
         // No identifier found, redirect to login
+        console.log('❌ No identifier found, redirecting to login');
         router.push('/login');
         return;
       }

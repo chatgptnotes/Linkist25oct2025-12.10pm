@@ -93,6 +93,8 @@ export default function LoginPage() {
 
       if (response.ok) {
         showToast('Verification code sent!', 'success');
+        // Clear old userProfile to prevent confusion with current login
+        localStorage.removeItem('userProfile');
         // Store email/phone and return URL for verification
         localStorage.setItem('loginIdentifier', identifier);
         localStorage.setItem('returnUrl', returnUrl);
