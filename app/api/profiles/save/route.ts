@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SupabaseProfileStore, ProfileInput } from '@/lib/supabase-profile-store'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +35,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Generate custom_url from firstName-lastName
+    let customUrl = `${data.firstName}-${data.lastName}`
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+
+    console.log('🔗 [POST /api/profiles/save] Generated custom URL:', customUrl)
+
+    // Check for uniqueness and append number if needed
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    let finalCustomUrl = customUrl
+    let counter = 1
+
+    // Check if custom_url already exists for another user
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('custom_url, email')
+      .eq('custom_url', finalCustomUrl)
+      .maybeSingle()
+
+    // If URL exists and belongs to a different email, find a unique one
+    if (existingProfile && existingProfile.email !== data.email) {
+      console.log('⚠️ [POST /api/profiles/save] Custom URL already exists, finding unique URL...')
+
+      while (true) {
+        const testUrl = `${customUrl}-${counter}`
+        const { data: testProfile } = await supabase
+          .from('profiles')
+          .select('custom_url')
+          .eq('custom_url', testUrl)
+          .maybeSingle()
+
+        if (!testProfile) {
+          finalCustomUrl = testUrl
+          console.log('✅ [POST /api/profiles/save] Found unique custom URL:', finalCustomUrl)
+          break
+        }
+        counter++
+      }
+    }
+
+    console.log('🔗 [POST /api/profiles/save] Final custom URL:', finalCustomUrl)
+
     // Prepare profile data for database
     const profileInput: ProfileInput = {
       email: data.email,
@@ -41,6 +88,7 @@ export async function POST(request: NextRequest) {
       company: data.companyName || null,
       is_founder_member: data.isFounderMember || false,
       avatar_url: data.profilePhoto || null,
+      custom_url: finalCustomUrl,
       preferences: {
         // Basic Information
         secondaryEmail: data.secondaryEmail || '',
@@ -109,6 +157,7 @@ export async function POST(request: NextRequest) {
         email: savedProfile.email,
         first_name: savedProfile.first_name,
         last_name: savedProfile.last_name,
+        custom_url: savedProfile.custom_url,
       }
     })
 
