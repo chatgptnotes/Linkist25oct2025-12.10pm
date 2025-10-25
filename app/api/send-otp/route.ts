@@ -7,7 +7,7 @@ import twilio from 'twilio';
 
 // Rate limiting: Track recent OTP sends to prevent duplicates
 const recentOTPSends = new Map<string, number>();
-const OTP_SEND_COOLDOWN = 5000; // 5 seconds cooldown between OTP sends
+const OTP_SEND_COOLDOWN = 60000; // 60 seconds cooldown between OTP sends (prevents duplicate sends)
 
 // Processing lock: Prevent concurrent processing of same identifier
 const processingLocks = new Map<string, boolean>();
