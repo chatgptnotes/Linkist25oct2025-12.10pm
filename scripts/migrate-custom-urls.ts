@@ -86,7 +86,11 @@ async function findUniqueCustomUrl(baseUrl: string): Promise<string> {
  * Main migration function
  */
 async function migrateCustomUrls() {
-  console.log('🚀 Starting custom_url migration...\n');
+  console.log('🚀 Starting custom_url and profile_url migration...\n');
+
+  // Get base URL for profile_url generation
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://linkist.ai';
+  console.log(`🌐 Using base URL: ${baseUrl}\n`);
 
   // Fetch all profiles without custom_url
   console.log('📊 Fetching profiles without custom_url...');
@@ -116,23 +120,29 @@ async function migrateCustomUrls() {
     const progress = `[${i + 1}/${profiles.length}]`;
 
     try {
-      // Generate base custom_url
-      const baseUrl = generateCustomUrl(profile.first_name, profile.last_name, profile.email);
+      // Generate base custom_url slug
+      const baseSlug = generateCustomUrl(profile.first_name, profile.last_name, profile.email);
 
       // Find unique custom_url
-      const uniqueUrl = await findUniqueCustomUrl(baseUrl);
+      const uniqueUrl = await findUniqueCustomUrl(baseSlug);
 
-      // Update profile
+      // Generate full profile URL
+      const fullProfileUrl = `${baseUrl}/${uniqueUrl}`;
+
+      // Update profile with both custom_url and profile_url
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ custom_url: uniqueUrl })
+        .update({
+          custom_url: uniqueUrl,
+          profile_url: fullProfileUrl
+        })
         .eq('id', profile.id);
 
       if (updateError) {
         console.error(`${progress} ❌ Failed to update ${profile.email}:`, updateError.message);
         errorCount++;
       } else {
-        console.log(`${progress} ✅ ${profile.email.padEnd(35)} → ${uniqueUrl}`);
+        console.log(`${progress} ✅ ${profile.email.padEnd(35)} → ${fullProfileUrl}`);
         successCount++;
       }
     } catch (err) {

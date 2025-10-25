@@ -63,6 +63,7 @@ export interface ProfileInput {
   is_founder_member?: boolean
   avatar_url?: string | null
   custom_url?: string | null
+  profile_url?: string | null
   preferences?: {
     // Basic Information
     secondaryEmail?: string
@@ -148,6 +149,7 @@ export const SupabaseProfileStore = {
       if (input.is_founder_member !== undefined) updates.is_founder_member = input.is_founder_member
       if (input.avatar_url !== undefined) updates.avatar_url = input.avatar_url
       if (input.custom_url !== undefined) updates.custom_url = input.custom_url
+      if (input.profile_url !== undefined) updates.profile_url = input.profile_url
 
       // Update new columns from preferences
       if (input.preferences) {
@@ -238,6 +240,7 @@ export const SupabaseProfileStore = {
       is_founder_member: input.is_founder_member || false,
       avatar_url: input.avatar_url || null,
       custom_url: input.custom_url || null,
+      profile_url: input.profile_url || null,
       preferences: input.preferences || {},
     }
 

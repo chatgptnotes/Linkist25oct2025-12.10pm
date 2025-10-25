@@ -78,6 +78,31 @@ export async function POST(request: NextRequest) {
 
     console.log('🔗 [POST /api/profiles/save] Final custom URL:', finalCustomUrl)
 
+    // Get base URL from request origin or referer
+    const origin = request.headers.get('origin') || request.headers.get('referer') || '';
+    let baseUrl = '';
+
+    if (origin) {
+      // Extract protocol and hostname from origin
+      try {
+        const url = new URL(origin);
+        baseUrl = `${url.protocol}//${url.host}`;
+      } catch (e) {
+        console.warn('⚠️ [POST /api/profiles/save] Failed to parse origin, using fallback');
+      }
+    }
+
+    // Fallback to environment variable if origin not available
+    if (!baseUrl) {
+      baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://linkist.ai';
+    }
+
+    // Generate full profile URL
+    const fullProfileUrl = `${baseUrl}/${finalCustomUrl}`;
+
+    console.log('🌐 [POST /api/profiles/save] Base URL:', baseUrl);
+    console.log('🔗 [POST /api/profiles/save] Full profile URL:', fullProfileUrl);
+
     // Prepare profile data for database
     const profileInput: ProfileInput = {
       email: data.email,
@@ -89,6 +114,7 @@ export async function POST(request: NextRequest) {
       is_founder_member: data.isFounderMember || false,
       avatar_url: data.profilePhoto || null,
       custom_url: finalCustomUrl,
+      profile_url: fullProfileUrl,
       preferences: {
         // Basic Information
         secondaryEmail: data.secondaryEmail || '',
