@@ -234,47 +234,28 @@ export default function WelcomeToLinkist() {
         return;
       }
 
-      // Step 2: Send OTP to user's mobile for verification
-      console.log('📱 Sending OTP to mobile:', fullMobile);
-      const otpResponse = await fetch('/api/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          emailOrPhone: fullMobile, // Send OTP to mobile number
-        }),
-      });
+      // Registration successful - redirect to mobile verification
+      // verify-mobile page will automatically send OTP
+      console.log('✅ User registered successfully, redirecting to mobile verification');
 
-      console.log('📱 OTP API response status:', otpResponse.status);
+      // Mark as onboarded
+      localStorage.setItem('userOnboarded', 'true');
 
-      if (otpResponse.ok) {
-        const otpData = await otpResponse.json();
-        console.log('✅ OTP sent successfully:', otpData);
-        showToast('Verification code sent to your mobile!', 'success');
+      // Store user profile data
+      localStorage.setItem('userProfile', JSON.stringify({
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        country: formData.country,
+        mobile: fullMobile
+      }));
 
-        // Mark as onboarded
-        localStorage.setItem('userOnboarded', 'true');
+      // Store login identifier for OTP verification
+      localStorage.setItem('loginIdentifier', fullMobile);
 
-        // Store user profile data
-        localStorage.setItem('userProfile', JSON.stringify({
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          country: formData.country,
-          mobile: fullMobile
-        }));
-
-        // Store login identifier for OTP verification
-        localStorage.setItem('loginIdentifier', fullMobile);
-
-        // Redirect to mobile verification with phone number
-        router.push(`/verify-mobile?phone=${encodeURIComponent(fullMobile)}`);
-      } else {
-        const otpData = await otpResponse.json();
-        showToast(otpData.error || 'Failed to send verification code', 'error');
-        setLoading(false);
-      }
+      // Redirect to mobile verification with phone number
+      // verify-mobile page will auto-send OTP
+      router.push(`/verify-mobile?phone=${encodeURIComponent(fullMobile)}`);
     } catch (error) {
       console.error('Registration error:', error);
       showToast('An error occurred. Please try again.', 'error');
