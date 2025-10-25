@@ -35,48 +35,65 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate custom_url from firstName-lastName
-    let customUrl = `${data.firstName}-${data.lastName}`
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '')
-
-    console.log('🔗 [POST /api/profiles/save] Generated custom URL:', customUrl)
-
-    // Check for uniqueness and append number if needed
+    // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    let finalCustomUrl = customUrl
-    let counter = 1
 
-    // Check if custom_url already exists for another user
-    const { data: existingProfile } = await supabase
+    // Check if this user already has a claimed custom_url (from /claim-url page)
+    const { data: existingUserProfile } = await supabase
       .from('profiles')
-      .select('custom_url, email')
-      .eq('custom_url', finalCustomUrl)
+      .select('custom_url')
+      .eq('email', data.email)
       .maybeSingle()
 
-    // If URL exists and belongs to a different email, find a unique one
-    if (existingProfile && existingProfile.email !== data.email) {
-      console.log('⚠️ [POST /api/profiles/save] Custom URL already exists, finding unique URL...')
+    let finalCustomUrl: string
 
-      while (true) {
-        const testUrl = `${customUrl}-${counter}`
-        const { data: testProfile } = await supabase
-          .from('profiles')
-          .select('custom_url')
-          .eq('custom_url', testUrl)
-          .maybeSingle()
+    if (existingUserProfile?.custom_url) {
+      // User already claimed a custom URL - preserve it!
+      finalCustomUrl = existingUserProfile.custom_url
+      console.log('✅ [POST /api/profiles/save] Preserving claimed custom URL:', finalCustomUrl)
+    } else {
+      // No claimed URL - generate custom_url from firstName-lastName
+      let customUrl = `${data.firstName}-${data.lastName}`
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
 
-        if (!testProfile) {
-          finalCustomUrl = testUrl
-          console.log('✅ [POST /api/profiles/save] Found unique custom URL:', finalCustomUrl)
-          break
+      console.log('🔗 [POST /api/profiles/save] Generated custom URL:', customUrl)
+
+      // Check for uniqueness and append number if needed
+      finalCustomUrl = customUrl
+      let counter = 1
+
+      // Check if custom_url already exists for another user
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('custom_url, email')
+        .eq('custom_url', finalCustomUrl)
+        .maybeSingle()
+
+      // If URL exists and belongs to a different email, find a unique one
+      if (existingProfile && existingProfile.email !== data.email) {
+        console.log('⚠️ [POST /api/profiles/save] Custom URL already exists, finding unique URL...')
+
+        while (true) {
+          const testUrl = `${customUrl}-${counter}`
+          const { data: testProfile } = await supabase
+            .from('profiles')
+            .select('custom_url')
+            .eq('custom_url', testUrl)
+            .maybeSingle()
+
+          if (!testProfile) {
+            finalCustomUrl = testUrl
+            console.log('✅ [POST /api/profiles/save] Found unique custom URL:', finalCustomUrl)
+            break
+          }
+          counter++
         }
-        counter++
       }
-    }
 
-    console.log('🔗 [POST /api/profiles/save] Final custom URL:', finalCustomUrl)
+      console.log('🔗 [POST /api/profiles/save] Final custom URL:', finalCustomUrl)
+    }
 
     // Get base URL from request origin or referer
     const origin = request.headers.get('origin') || request.headers.get('referer') || '';
