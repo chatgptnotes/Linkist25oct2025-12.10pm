@@ -235,11 +235,18 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-apply LINKISTFM discount for founding members
+  // Auto-apply LINKISTFM voucher on page load
   useEffect(() => {
-    const autoApplyFoundingDiscount = async () => {
-      // Only run once
-      if (autoAppliedVoucher) return;
+    const autoApplyVoucher = async () => {
+      // Only run once and if not already applied
+      if (autoAppliedVoucher || voucherValid === true) return;
+
+      // Check if user email is available from form data
+      const userEmail = watchedValues.email;
+      if (!userEmail) {
+        // Wait for email to be available
+        return;
+      }
 
       try {
         // Check if user is a founding member
@@ -248,42 +255,44 @@ export default function CheckoutPage() {
           const data = await response.json();
           const isFoundingMember = data.user?.is_founding_member || false;
           setUserIsFoundingMember(isFoundingMember);
+        }
 
-          // Auto-apply LINKISTFM discount if founding member
-          if (isFoundingMember && !voucherCode) {
-            console.log('Auto-applying LINKISTFM discount for founding member');
-            setVoucherCode('LINKISTFM');
-            setAutoAppliedVoucher(true);
+        // Auto-validate and apply LINKISTFM voucher
+        if (voucherCode === 'LINKISTFM') {
+          console.log('Auto-applying LINKISTFM voucher...');
+          setAutoAppliedVoucher(true);
+          setApplyingVoucher(true);
 
-            // Validate the voucher
-            const voucherResponse = await fetch('/api/vouchers/validate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                code: 'LINKISTFM',
-                orderAmount: 100, // Temporary value, will be recalculated
-                userEmail: data.user?.email,
-              }),
-            });
+          const pricing = calculatePricing();
+          const voucherResponse = await fetch('/api/vouchers/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: 'LINKISTFM',
+              orderAmount: pricing.totalBeforeDiscount || 100,
+              userEmail: userEmail,
+            }),
+          });
 
-            if (voucherResponse.ok) {
-              const voucherData = await voucherResponse.json();
-              if (voucherData.valid && voucherData.voucher) {
-                setVoucherDiscount(voucherData.voucher.discount_value);
-                setVoucherDiscountAmount(voucherData.voucher.discount_amount || 0);
-                setVoucherValid(true);
-                console.log('Founding member discount applied:', voucherData.voucher.discount_value, 'Amount:', voucherData.voucher.discount_amount);
-              }
+          if (voucherResponse.ok) {
+            const voucherData = await voucherResponse.json();
+            if (voucherData.valid && voucherData.voucher) {
+              setVoucherDiscount(voucherData.voucher.discount_value);
+              setVoucherDiscountAmount(voucherData.voucher.discount_amount || 0);
+              setVoucherValid(true);
+              console.log('✅ LINKISTFM voucher auto-applied:', voucherData.voucher.discount_value, 'Max amount:', voucherData.voucher.discount_amount);
             }
           }
+          setApplyingVoucher(false);
         }
       } catch (error) {
-        console.error('Error auto-applying founding member discount:', error);
+        console.error('Error auto-applying voucher:', error);
+        setApplyingVoucher(false);
       }
     };
 
-    autoApplyFoundingDiscount();
-  }, [autoAppliedVoucher, voucherCode]);
+    autoApplyVoucher();
+  }, [autoAppliedVoucher, voucherCode, voucherValid, watchedValues.email]);
 
   // Save voucher state to localStorage whenever it changes
   useEffect(() => {
@@ -978,7 +987,7 @@ export default function CheckoutPage() {
                 {/* Voucher Code Section */}
                 <div className="border-t pt-4 mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Have a voucher code?
+                    Voucher code
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -989,39 +998,38 @@ export default function CheckoutPage() {
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm uppercase"
                       disabled={applyingVoucher || (voucherValid === true)}
                     />
-                    <button
-                      type="button"
-                      onClick={validateVoucher}
-                      disabled={applyingVoucher || !voucherCode.trim() || (voucherValid === true)}
-                      className="px-6 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
-                      style={{
-                        minWidth: '100px',
-                        backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true)) ? '#16a34a' : '#dc2626',
-                        color: '#FFFFFF',
-                        cursor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true)) ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {applyingVoucher ? (
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-1"></div>
-                          <span>Applying...</span>
-                        </div>
-                      ) : voucherValid === true ? (
-                        <div className="flex items-center justify-center">
-                          <CheckIcon className="h-4 w-4 mr-1" />
-                          <span>Applied</span>
-                        </div>
-                      ) : (
-                        'Apply'
-                      )}
-                    </button>
+                    {!voucherValid && !applyingVoucher && (
+                      <button
+                        type="button"
+                        onClick={validateVoucher}
+                        disabled={applyingVoucher || !voucherCode.trim() || (voucherValid === true)}
+                        className="px-6 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-red-600 hover:bg-red-700 text-white"
+                        style={{ minWidth: '100px' }}
+                      >
+                        Apply
+                      </button>
+                    )}
+                    {applyingVoucher && (
+                      <div className="flex items-center justify-center px-6 py-2 bg-blue-600 text-white rounded-lg" style={{ minWidth: '100px' }}>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-1"></div>
+                        <span className="text-sm font-medium">Applying...</span>
+                      </div>
+                    )}
+                    {voucherValid === true && (
+                      <div className="flex items-center justify-center px-6 py-2 bg-green-600 text-white rounded-lg" style={{ minWidth: '100px' }}>
+                        <CheckIcon className="h-4 w-4 mr-1" />
+                        <span className="text-sm font-medium">Applied</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Voucher Status Messages */}
                   {voucherValid === true && (
                     <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-center">
                       <CheckIcon className="h-4 w-4 text-green-600 mr-2" />
-                      <p className="text-sm text-green-700">Voucher applied successfully!</p>
+                      <p className="text-sm text-green-700">
+                        {autoAppliedVoucher ? '✨ Voucher auto-applied!' : 'Voucher applied successfully!'}
+                      </p>
                     </div>
                   )}
                   {voucherValid === false && (
