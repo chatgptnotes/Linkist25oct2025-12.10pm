@@ -66,13 +66,15 @@ export async function POST(request: NextRequest) {
       console.warn(`⚠️ Elevated risk score: ${spamCheck.riskScore} for phone ${mobile} from IP ${ipAddress}`);
     }
 
-    // Use database OTP only if Twilio not configured (not based on NODE_ENV)
-    const useDatabaseOTP = !accountSid || !authToken || !verifyServiceSid;
+    // Use hardcoded OTP if environment variable is set, or if Twilio not configured
+    const useHardcodedOTP = process.env.USE_HARDCODED_OTP === 'true';
+    const useDatabaseOTP = useHardcodedOTP || !accountSid || !authToken || !verifyServiceSid;
 
     console.log('🔍 SMS OTP Debug:', {
       accountSid: accountSid ? 'Set' : 'Missing',
       authToken: authToken ? 'Set' : 'Missing',
       verifyServiceSid: verifyServiceSid ? 'Set' : 'Missing',
+      useHardcodedOTP,
       useDatabaseOTP,
       mobile
     });
@@ -115,9 +117,11 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'Verification code generated',
-        devOtp: otp, // Show OTP in development
-        smsStatus: 'database'
+        message: useHardcodedOTP
+          ? 'Verification code displayed on screen (testing mode)'
+          : 'Verification code generated',
+        devOtp: otp, // Show OTP for testing
+        smsStatus: useHardcodedOTP ? 'hardcoded' : 'database'
       });
     }
 
