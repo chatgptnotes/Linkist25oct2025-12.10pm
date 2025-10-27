@@ -903,14 +903,13 @@ export default function NFCPaymentPage() {
                   {/* Front Card */}
                   <div className="mb-3 sm:mb-4">
                     <div className={`w-48 sm:w-56 aspect-[1.6/1] bg-gradient-to-br ${getCardGradient()} rounded-lg sm:rounded-xl relative overflow-hidden shadow-lg mr-auto`}>
-                      {/* AI Icon top right - Plain, no background */}
-                      <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                        <img
-                          src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
-                          alt="AI"
-                          className={`w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
-                        />
-                      </div>
+                      {/* AI Icon top right - No wrapper, no background, no shadow */}
+                      <img
+                        src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
+                        alt="AI"
+                        className={`absolute top-2 sm:top-3 right-2 sm:right-3 w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
+                        style={{ boxShadow: 'none', background: 'transparent' }}
+                      />
 
                       {/* User Name or Initials */}
                       <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4">
