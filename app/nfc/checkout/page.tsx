@@ -100,12 +100,36 @@ export default function CheckoutPage() {
   // PIN modal and related state removed - no longer needed
   // const [step, setStep] = useState<'shipping' | 'payment' | 'review'>('shipping');
 
-  // Voucher state
-  const [voucherCode, setVoucherCode] = useState('LINKISTFM'); // Pre-fill with LINKISTFM
-  const [voucherDiscount, setVoucherDiscount] = useState(0);
-  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0); // Actual capped discount amount from API
-  const [voucherType, setVoucherType] = useState<'fixed' | 'percentage'>('fixed'); // Track voucher type
-  const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
+  // Initialize voucher state from localStorage to prevent price flash
+  const getInitialVoucherState = () => {
+    if (typeof window === 'undefined') return { code: 'LINKISTFM', discount: 0, amount: 0, type: 'fixed', valid: null };
+
+    try {
+      const savedState = localStorage.getItem('checkoutVoucherState');
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        return {
+          code: parsed.voucherCode || 'LINKISTFM',
+          discount: parsed.voucherDiscount || 0,
+          amount: parsed.voucherDiscountAmount || 0,
+          type: parsed.voucherType || 'fixed',
+          valid: parsed.voucherValid || null
+        };
+      }
+    } catch (error) {
+      console.error('Error loading initial voucher state:', error);
+    }
+    return { code: 'LINKISTFM', discount: 0, amount: 0, type: 'fixed', valid: null };
+  };
+
+  const initialVoucher = getInitialVoucherState();
+
+  // Voucher state - initialized from localStorage
+  const [voucherCode, setVoucherCode] = useState(initialVoucher.code);
+  const [voucherDiscount, setVoucherDiscount] = useState(initialVoucher.discount);
+  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(initialVoucher.amount);
+  const [voucherType, setVoucherType] = useState<'fixed' | 'percentage'>(initialVoucher.type);
+  const [voucherValid, setVoucherValid] = useState<boolean | null>(initialVoucher.valid);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [autoAppliedVoucher, setAutoAppliedVoucher] = useState(false);
   const [userIsFoundingMember, setUserIsFoundingMember] = useState(false);
