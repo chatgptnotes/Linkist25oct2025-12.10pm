@@ -1017,11 +1017,11 @@ export default function NFCPaymentPage() {
                       <button
                         type="button"
                         onClick={validateVoucher}
-                        disabled={applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')}
+                        disabled={applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')}
                         style={{
-                          backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')) ? '#d1d5db' : '#dc2626',
+                          backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')) ? '#d1d5db' : '#dc2626',
                           color: '#ffffff',
-                          opacity: (applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')) ? 0.6 : 1
+                          opacity: (applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')) ? 0.6 : 1
                         }}
                         className="px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap cursor-pointer"
                       >
