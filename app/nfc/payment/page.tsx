@@ -81,6 +81,8 @@ export default function NFCPaymentPage() {
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [voucherType, setVoucherType] = useState<'percentage' | 'fixed'>('percentage');
   const [voucherAmount, setVoucherAmount] = useState(0);
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState('');
+  const [originalTotal, setOriginalTotal] = useState(0);
 
   // Founding member status
   const [isFoundingMember, setIsFoundingMember] = useState(false);
@@ -100,6 +102,11 @@ export default function NFCPaymentPage() {
         setOrderData(data);
         setCardHolder(''); // Keep cardholder name blank
         setHasOrderError(false);
+
+        // Store original total before any discounts
+        if (data.pricing?.total) {
+          setOriginalTotal(data.pricing.total);
+        }
 
         // Load voucher from order data if present
         if (data.pricing?.voucherCode) {
@@ -152,6 +159,7 @@ export default function NFCPaymentPage() {
 
               setVoucherDiscount(discountPercent);
               setVoucherValid(true);
+              setAppliedVoucherCode('LINKISTFM');
               console.log('Founding member discount auto-applied:', voucherData.voucher.discount_type, voucherData.voucher.discount_amount);
             }
           }
@@ -200,6 +208,7 @@ export default function NFCPaymentPage() {
 
                 setVoucherDiscount(discountPercent);
                 setVoucherValid(true);
+                setAppliedVoucherCode('LINKISTFM');
                 console.log('Founding member discount auto-applied (from API):', voucherData.voucher.discount_type, voucherData.voucher.discount_amount);
               }
             }
@@ -302,14 +311,25 @@ export default function NFCPaymentPage() {
       return;
     }
 
+    // Prevent re-applying the same voucher (check appliedVoucherCode regardless of voucherValid state)
+    if (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '') {
+      console.log('Voucher already applied, skipping re-application');
+      // Re-set the valid state if it was reset
+      setVoucherValid(true);
+      return;
+    }
+
     setApplyingVoucher(true);
     try {
+      // Use original total for voucher validation, not the current (possibly discounted) total
+      const amountForValidation = originalTotal > 0 ? originalTotal : (orderData?.pricing.total || 0);
+
       const response = await fetch('/api/vouchers/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: voucherCode.toUpperCase(),
-          orderAmount: orderData?.pricing.total || 0,
+          orderAmount: amountForValidation,
           userEmail: orderData?.email
         })
       });
@@ -327,17 +347,20 @@ export default function NFCPaymentPage() {
 
         setVoucherDiscount(discountPercent);
         setVoucherValid(true);
+        setAppliedVoucherCode(voucherCode.toUpperCase());
       } else {
         setVoucherDiscount(0);
         setVoucherValid(false);
         setVoucherType('percentage');
         setVoucherAmount(0);
+        setAppliedVoucherCode('');
         alert('Invalid voucher code');
       }
     } catch (error) {
       console.error('Error validating voucher:', error);
       setVoucherDiscount(0);
       setVoucherValid(false);
+      setAppliedVoucherCode('');
       alert('Error validating voucher. Please try again.');
     } finally {
       setApplyingVoucher(false);
@@ -372,18 +395,14 @@ export default function NFCPaymentPage() {
   const getFinalAmount = () => {
     if (!orderData) return 0;
 
-    // If voucher was already applied in checkout, use the final total from checkout
-    // Don't reapply the discount
-    if (orderData.pricing.voucherCode && orderData.pricing.voucherDiscount > 0) {
-      return orderData.pricing.total;
+    // If voucher is valid and has amount, apply discount on original total
+    if (voucherValid && voucherAmount > 0) {
+      const baseAmount = originalTotal > 0 ? originalTotal : orderData.pricing.total;
+      return Math.max(0, baseAmount - voucherAmount);
     }
 
-    // Otherwise, calculate discount fresh (for vouchers applied on payment page)
-    const baseAmount = orderData.pricing.totalBeforeDiscount || orderData.pricing.total;
-    const discountAmount = voucherType === 'fixed'
-      ? voucherAmount
-      : (baseAmount * voucherDiscount) / 100;
-    return Math.max(0, baseAmount - discountAmount);
+    // Otherwise return original total
+    return originalTotal > 0 ? originalTotal : orderData.pricing.total;
   };
 
   const handleStripePayment = async () => {
@@ -884,21 +903,13 @@ export default function NFCPaymentPage() {
                   {/* Front Card */}
                   <div className="mb-3 sm:mb-4">
                     <div className={`w-48 sm:w-56 aspect-[1.6/1] bg-gradient-to-br ${getCardGradient()} rounded-lg sm:rounded-xl relative overflow-hidden shadow-lg mr-auto`}>
-                      {/* AI Icon top right - Changes based on card color */}
+                      {/* AI Icon top right - Plain, no background */}
                       <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                        <div
-                          className={`rounded-md sm:rounded-lg p-1.5 sm:p-2 shadow-md ${
-                            orderData?.cardConfig?.color === 'white'
-                              ? 'bg-white'
-                              : 'bg-gray-900'
-                          }`}
-                        >
-                          <img
-                            src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
-                            alt="AI"
-                            className={`w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
-                          />
-                        </div>
+                        <img
+                          src={orderData?.cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
+                          alt="AI"
+                          className={`w-3 h-3 sm:w-4 sm:h-4 ${orderData?.cardConfig?.color === 'white' ? '' : 'invert'}`}
+                        />
                       </div>
 
                       {/* User Name or Initials */}
@@ -979,85 +990,70 @@ export default function NFCPaymentPage() {
                   <span>${orderData.pricing.taxAmount.toFixed(2)}</span>
                 </div>
 
-                {/* Voucher Section - Only show input if not founding member AND no voucher applied */}
-                {!isFoundingMember && !orderData?.pricing?.voucherCode && (
-                  <div className="border-t pt-2 sm:pt-3 mt-2">
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                      Have a Voucher Code?
-                    </label>
-                    <div className="flex gap-2">
+                {/* Voucher Section with Dashed Border */}
+                <div className="border-t-2 border-dashed border-gray-300 pt-3 mt-3">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4">
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Have a voucher code?</h3>
+
+                    <div className="flex gap-2 mb-3">
                       <input
                         type="text"
                         value={voucherCode}
-                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                        placeholder="ENTER CODE"
-                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase"
+                        onChange={(e) => {
+                          const newCode = e.target.value.toUpperCase();
+                          setVoucherCode(newCode);
+                          // Reset validation ONLY when code changes to something different
+                          if (newCode !== appliedVoucherCode) {
+                            setVoucherValid(null);
+                            setVoucherDiscount(0);
+                            setVoucherAmount(0);
+                            setAppliedVoucherCode('');
+                          }
+                        }}
+                        placeholder="LINKISTFM"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 uppercase cursor-text"
                       />
+
                       <button
                         type="button"
                         onClick={validateVoucher}
-                        disabled={applyingVoucher || !voucherCode.trim()}
-                        className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ backgroundColor: '#ff0000', color: '#FFFFFF' }}
+                        disabled={applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')}
+                        style={{
+                          backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')) ? '#d1d5db' : '#dc2626',
+                          color: '#ffffff',
+                          opacity: (applyingVoucher || !voucherCode.trim() || (voucherCode.toUpperCase() === appliedVoucherCode && appliedVoucherCode !== '')) ? 0.6 : 1
+                        }}
+                        className="px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap cursor-pointer"
                       >
                         {applyingVoucher ? 'Applying...' : 'Apply'}
                       </button>
                     </div>
 
                     {voucherValid === true && (
-                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-                        <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 mt-0.5" />
-                        <div className="text-xs text-green-700">
-                          <p className="font-medium">Voucher Applied!</p>
-                          <p>
-                            You get {voucherType === 'fixed' ? `flat $${voucherAmount.toFixed(2)}` : `${voucherDiscount}%`} off on your order
-                          </p>
-                        </div>
+                      <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        <p className="text-sm text-green-700">Voucher applied successfully!</p>
                       </div>
                     )}
 
                     {voucherValid === false && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                        <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-600 mt-0.5" />
-                        <div className="text-xs text-red-700">
-                          <p className="font-medium">Invalid Voucher</p>
-                          <p>This voucher code is not valid or has expired</p>
-                        </div>
+                      <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                        <p className="text-sm text-red-700">Invalid voucher code</p>
                       </div>
                     )}
                   </div>
-                )}
+                </div>
 
-                {/* Founding Member Yellow Card - ONLY show when discount is actually applied */}
-                {isFoundingMember && voucherValid === true && voucherDiscount > 0 && (
-                  <div className="border-t pt-2 sm:pt-3 mt-2">
-                    <div className="p-2 sm:p-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                        <div className="text-xs sm:text-sm">
-                          <p className="font-bold text-yellow-900">Founding Member Discount Auto-Applied!</p>
-                          <p className="text-yellow-800 mt-1">Your exclusive discount has been automatically applied to your order.</p>
-                        </div>
-                      </div>
-                    </div>
+                {/* Discount Line - Outside dashed box */}
+                {voucherValid && voucherAmount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium text-sm">
+                    <span>Voucher Discount ({voucherDiscount}% off)</span>
+                    <span>-${voucherAmount.toFixed(2)}</span>
                   </div>
                 )}
 
-                {/* Discount Line */}
-                {voucherDiscount > 0 && voucherValid && (
-                  <div className="flex justify-between text-green-600 font-medium">
-                    <span>
-                      Voucher Discount ({voucherType === 'fixed' ? `Flat $${voucherAmount.toFixed(2)}` : `${voucherDiscount}%`} off)
-                    </span>
-                    <span>
-                      -${orderData.pricing.discountAmount ? orderData.pricing.discountAmount.toFixed(2) : (voucherType === 'fixed' ? voucherAmount.toFixed(2) : ((orderData.pricing.totalBeforeDiscount || orderData.pricing.total) * voucherDiscount / 100).toFixed(2))}
-                    </span>
-                  </div>
-                )}
-
-                <div className="border-t pt-2 sm:pt-3 flex justify-between font-semibold text-sm sm:text-base">
+                <div className="border-t-2 border-dashed border-gray-300 pt-3 mt-3 flex justify-between font-semibold text-sm sm:text-base">
                   <span>Total</span>
                   <span>${getFinalAmount().toFixed(2)}</span>
                 </div>
