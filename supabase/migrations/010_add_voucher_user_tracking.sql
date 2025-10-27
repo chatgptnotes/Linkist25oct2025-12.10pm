@@ -94,11 +94,11 @@ INSERT INTO vouchers (
 )
 VALUES (
   'LINKISTFM',
-  'Founding Member Exclusive Discount - 50% off for early supporters',
+  'Founding Member Exclusive Discount - Free 1 Year Subscription (up to $120 value)',
   'percentage',
   50,
   0,
-  NULL,
+  120, -- Cap discount at $120 (subscription value)
   NULL, -- Unlimited total usage
   1,    -- One per user
   COALESCE(
@@ -116,6 +116,7 @@ SET
   description = EXCLUDED.description,
   discount_type = EXCLUDED.discount_type,
   discount_value = EXCLUDED.discount_value,
+  max_discount_amount = EXCLUDED.max_discount_amount,
   user_limit = EXCLUDED.user_limit,
   valid_from = EXCLUDED.valid_from,
   valid_until = EXCLUDED.valid_until,

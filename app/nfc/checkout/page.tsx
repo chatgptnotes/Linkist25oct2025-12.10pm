@@ -101,8 +101,9 @@ export default function CheckoutPage() {
   // const [step, setStep] = useState<'shipping' | 'payment' | 'review'>('shipping');
 
   // Voucher state
-  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherCode, setVoucherCode] = useState('LINKISTFM'); // Pre-fill with LINKISTFM
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0); // Actual capped discount amount from API
   const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [autoAppliedVoucher, setAutoAppliedVoucher] = useState(false);
@@ -131,6 +132,23 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     console.log('Checkout: Loading configuration data...');
+
+    // Restore voucher state from localStorage if it exists
+    const savedVoucherState = localStorage.getItem('checkoutVoucherState');
+    if (savedVoucherState) {
+      try {
+        const voucherState = JSON.parse(savedVoucherState);
+        if (voucherState.voucherCode) {
+          setVoucherCode(voucherState.voucherCode);
+          setVoucherDiscount(voucherState.voucherDiscount || 0);
+          setVoucherDiscountAmount(voucherState.voucherDiscountAmount || 0);
+          setVoucherValid(voucherState.voucherValid || false);
+          console.log('Checkout: Restored voucher state from localStorage:', voucherState);
+        }
+      } catch (error) {
+        console.error('Checkout: Error parsing saved voucher state:', error);
+      }
+    }
 
     // Check for nfcConfig first (this is what configure page saves)
     const nfcConfigStr = localStorage.getItem('nfcConfig');
@@ -252,8 +270,9 @@ export default function CheckoutPage() {
               const voucherData = await voucherResponse.json();
               if (voucherData.valid && voucherData.voucher) {
                 setVoucherDiscount(voucherData.voucher.discount_value);
+                setVoucherDiscountAmount(voucherData.voucher.discount_amount || 0);
                 setVoucherValid(true);
-                console.log('Founding member discount applied:', voucherData.voucher.discount_value);
+                console.log('Founding member discount applied:', voucherData.voucher.discount_value, 'Amount:', voucherData.voucher.discount_amount);
               }
             }
           }
@@ -265,6 +284,23 @@ export default function CheckoutPage() {
 
     autoApplyFoundingDiscount();
   }, [autoAppliedVoucher, voucherCode]);
+
+  // Save voucher state to localStorage whenever it changes
+  useEffect(() => {
+    if (voucherValid === true && voucherCode && voucherDiscount > 0) {
+      const voucherState = {
+        voucherCode,
+        voucherDiscount,
+        voucherDiscountAmount,
+        voucherValid: true,
+      };
+      localStorage.setItem('checkoutVoucherState', JSON.stringify(voucherState));
+      console.log('Checkout: Saved voucher state to localStorage:', voucherState);
+    } else if (voucherValid === false) {
+      // Clear saved voucher if validation failed
+      localStorage.removeItem('checkoutVoucherState');
+    }
+  }, [voucherValid, voucherCode, voucherDiscount, voucherDiscountAmount]);
 
   const calculatePricing = () => {
     // Get price based on selected material
@@ -293,8 +329,11 @@ export default function CheckoutPage() {
     const shippingCost = 0;
     const totalBeforeDiscount = subtotal + taxAmount + shippingCost;
 
-    // Apply voucher discount
-    const discountAmount = (totalBeforeDiscount * voucherDiscount) / 100;
+    // Apply voucher discount - use the capped amount from API if available
+    // Otherwise calculate from percentage (for backward compatibility)
+    const discountAmount = voucherDiscountAmount > 0
+      ? voucherDiscountAmount
+      : (totalBeforeDiscount * voucherDiscount) / 100;
     const total = Math.max(0, totalBeforeDiscount - discountAmount);
 
     return {
@@ -340,15 +379,19 @@ export default function CheckoutPage() {
           : Math.round((result.voucher.discount_amount / (pricing.totalBeforeDiscount || 1)) * 100);
 
         setVoucherDiscount(discountPercent);
+        // Store the actual capped discount amount from API
+        setVoucherDiscountAmount(result.voucher.discount_amount || 0);
         setVoucherValid(true);
       } else {
         setVoucherDiscount(0);
+        setVoucherDiscountAmount(0);
         setVoucherValid(false);
         alert('Invalid voucher code');
       }
     } catch (error) {
       console.error('Error validating voucher:', error);
       setVoucherDiscount(0);
+      setVoucherDiscountAmount(0);
       setVoucherValid(false);
       alert('Error validating voucher. Please try again.');
     } finally {
@@ -468,6 +511,10 @@ export default function CheckoutPage() {
 
       // Small delay to ensure localStorage is written
       await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Clear the voucher state from localStorage as it's now saved in the order
+      localStorage.removeItem('checkoutVoucherState');
+      console.log('🧹 Checkout: Cleared voucher state from localStorage');
 
       console.log('🔀 Checkout: Redirecting to payment page...');
 
@@ -928,9 +975,65 @@ export default function CheckoutPage() {
                   <span>${pricing.taxAmount.toFixed(2)}</span>
                 </div>
 
+                {/* Voucher Code Section */}
+                <div className="border-t pt-4 mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Have a voucher code?
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                      placeholder="Enter voucher code"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm uppercase"
+                      disabled={applyingVoucher || (voucherValid === true)}
+                    />
+                    <button
+                      type="button"
+                      onClick={validateVoucher}
+                      disabled={applyingVoucher || !voucherCode.trim() || (voucherValid === true)}
+                      className="px-6 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                      style={{
+                        minWidth: '100px',
+                        backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true)) ? '#16a34a' : '#dc2626',
+                        color: '#FFFFFF',
+                        cursor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true)) ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {applyingVoucher ? (
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-1"></div>
+                          <span>Applying...</span>
+                        </div>
+                      ) : voucherValid === true ? (
+                        <div className="flex items-center justify-center">
+                          <CheckIcon className="h-4 w-4 mr-1" />
+                          <span>Applied</span>
+                        </div>
+                      ) : (
+                        'Apply'
+                      )}
+                    </button>
+                  </div>
 
-                {/* Founding Member Auto-Applied Message */}
-                {userIsFoundingMember && autoAppliedVoucher && (
+                  {/* Voucher Status Messages */}
+                  {voucherValid === true && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-center">
+                      <CheckIcon className="h-4 w-4 text-green-600 mr-2" />
+                      <p className="text-sm text-green-700">Voucher applied successfully!</p>
+                    </div>
+                  )}
+                  {voucherValid === false && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center">
+                      <ErrorOutlineIcon className="h-4 w-4 text-red-600 mr-2" />
+                      <p className="text-sm text-red-700">Invalid voucher code</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Founding Member Auto-Applied Message - Only show when discount is actually applied */}
+                {userIsFoundingMember && voucherValid === true && voucherDiscount > 0 && (
                   <div className="border-t pt-3 mt-2">
                     <div className="p-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
                       <div className="flex items-start gap-2">
@@ -939,7 +1042,7 @@ export default function CheckoutPage() {
                         </svg>
                         <div className="text-sm">
                           <p className="font-bold text-yellow-900">Founding Member Discount Applied!</p>
-                          <p className="text-yellow-800 mt-1">Your exclusive 50% discount has been automatically applied.</p>
+                          <p className="text-yellow-800 mt-1">Your exclusive {voucherDiscount}% discount has been automatically applied.</p>
                         </div>
                       </div>
                     </div>

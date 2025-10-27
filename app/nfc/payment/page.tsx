@@ -123,8 +123,8 @@ export default function NFCPaymentPage() {
         console.log('Using founding member status from order data:', orderData.isFoundingMember);
         setIsFoundingMember(orderData.isFoundingMember);
 
-        // Auto-apply LINKISTFM for founding members if not already applied
-        if (orderData.isFoundingMember && !voucherCode) {
+        // Auto-apply LINKISTFM for founding members if not already applied in checkout
+        if (orderData.isFoundingMember && !voucherCode && !orderData.pricing?.voucherCode) {
           console.log('Auto-applying LINKISTFM for founding member on payment page');
           setVoucherCode('LINKISTFM');
 
@@ -171,8 +171,8 @@ export default function NFCPaymentPage() {
           const isFounding = data.user?.is_founding_member || false;
           setIsFoundingMember(isFounding);
 
-          // Auto-apply LINKISTFM for founding members if not already applied
-          if (isFounding && !voucherCode && orderData) {
+          // Auto-apply LINKISTFM for founding members if not already applied in checkout
+          if (isFounding && !voucherCode && orderData && !orderData.pricing?.voucherCode) {
             console.log('Auto-applying LINKISTFM for founding member (from API)');
             setVoucherCode('LINKISTFM');
 
@@ -372,7 +372,14 @@ export default function NFCPaymentPage() {
   const getFinalAmount = () => {
     if (!orderData) return 0;
 
-    const baseAmount = orderData.pricing.total;
+    // If voucher was already applied in checkout, use the final total from checkout
+    // Don't reapply the discount
+    if (orderData.pricing.voucherCode && orderData.pricing.voucherDiscount > 0) {
+      return orderData.pricing.total;
+    }
+
+    // Otherwise, calculate discount fresh (for vouchers applied on payment page)
+    const baseAmount = orderData.pricing.totalBeforeDiscount || orderData.pricing.total;
     const discountAmount = voucherType === 'fixed'
       ? voucherAmount
       : (baseAmount * voucherDiscount) / 100;
@@ -972,8 +979,8 @@ export default function NFCPaymentPage() {
                   <span>${orderData.pricing.taxAmount.toFixed(2)}</span>
                 </div>
 
-                {/* Voucher Section - Hidden for Founding Members (auto-applied) */}
-                {!isFoundingMember ? (
+                {/* Voucher Section - Only show input if not founding member AND no voucher applied */}
+                {!isFoundingMember && !orderData?.pricing?.voucherCode && (
                   <div className="border-t pt-2 sm:pt-3 mt-2">
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                       Have a Voucher Code?
@@ -1019,7 +1026,10 @@ export default function NFCPaymentPage() {
                       </div>
                     )}
                   </div>
-                ) : (
+                )}
+
+                {/* Founding Member Yellow Card - ONLY show when discount is actually applied */}
+                {isFoundingMember && voucherValid === true && voucherDiscount > 0 && (
                   <div className="border-t pt-2 sm:pt-3 mt-2">
                     <div className="p-2 sm:p-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
                       <div className="flex items-start gap-2">
@@ -1042,7 +1052,7 @@ export default function NFCPaymentPage() {
                       Voucher Discount ({voucherType === 'fixed' ? `Flat $${voucherAmount.toFixed(2)}` : `${voucherDiscount}%`} off)
                     </span>
                     <span>
-                      -${voucherType === 'fixed' ? voucherAmount.toFixed(2) : ((orderData.pricing.total * voucherDiscount) / 100).toFixed(2)}
+                      -${orderData.pricing.discountAmount ? orderData.pricing.discountAmount.toFixed(2) : (voucherType === 'fixed' ? voucherAmount.toFixed(2) : ((orderData.pricing.totalBeforeDiscount || orderData.pricing.total) * voucherDiscount / 100).toFixed(2))}
                     </span>
                   </div>
                 )}

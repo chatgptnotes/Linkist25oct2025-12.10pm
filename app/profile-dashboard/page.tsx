@@ -87,6 +87,16 @@ interface AccountStats {
   joinDate: string;
 }
 
+interface AnalyticsData {
+  totalViews: number;
+  uniqueViews: number;
+  whatsappEngagement: number;
+  emailEngagement: number;
+  socialMediaEngagement: number;
+  recentViews: any[];
+  recentEngagements: any[];
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -96,10 +106,42 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
 
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
+
+  const loadAnalyticsData = async (email: string) => {
+    try {
+      console.log('📊 Fetching analytics data for:', email);
+      const analyticsResponse = await fetch(`/api/profile-analytics?email=${encodeURIComponent(email)}`);
+
+      if (analyticsResponse.ok) {
+        const analyticsResult = await analyticsResponse.json();
+        if (analyticsResult.success && analyticsResult.data) {
+          console.log('✅ Analytics data loaded:', analyticsResult.data);
+          setAnalytics(analyticsResult.data);
+        } else {
+          console.log('⚠️ No analytics data available');
+          // Set default zero values if no data
+          setAnalytics({
+            totalViews: 0,
+            uniqueViews: 0,
+            whatsappEngagement: 0,
+            emailEngagement: 0,
+            socialMediaEngagement: 0,
+            recentViews: [],
+            recentEngagements: []
+          });
+        }
+      } else {
+        console.error('❌ Failed to fetch analytics data');
+      }
+    } catch (error) {
+      console.error('❌ Error loading analytics:', error);
+    }
+  };
 
   const checkAuthAndLoadData = async () => {
     try {
@@ -141,6 +183,9 @@ export default function AccountPage() {
       setUser(data.data.user);
       setOrders(data.data.orders);
       setStats(data.data.stats);
+
+      // Load analytics data
+      loadAnalyticsData(userEmail);
 
       // Load profile data from database API
       try {
@@ -595,7 +640,7 @@ export default function AccountPage() {
                     </div>
                     <span className="text-sm text-gray-700">Total Profile Views</span>
                   </div>
-                  <span className="text-2xl font-bold text-gray-900">{stats?.totalOrders ? stats.totalOrders * 40 : 247}</span>
+                  <span className="text-2xl font-bold text-gray-900">{analytics?.totalViews || 0}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -605,7 +650,7 @@ export default function AccountPage() {
                     </div>
                     <span className="text-sm text-gray-700">Unique Views</span>
                   </div>
-                  <span className="text-2xl font-bold text-green-600">{stats?.totalOrders ? stats.totalOrders * 2 : 12}</span>
+                  <span className="text-2xl font-bold text-green-600">{analytics?.uniqueViews || 0}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -615,7 +660,7 @@ export default function AccountPage() {
                     </div>
                     <span className="text-sm text-gray-700">WhatsApp Engagement</span>
                   </div>
-                  <span className="text-2xl font-bold text-yellow-600">{stats?.totalOrders ? stats.totalOrders + 2 : 8}</span>
+                  <span className="text-2xl font-bold text-yellow-600">{analytics?.whatsappEngagement || 0}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -625,7 +670,7 @@ export default function AccountPage() {
                     </div>
                     <span className="text-sm text-gray-700">Email Engagement</span>
                   </div>
-                  <span className="text-2xl font-bold text-blue-600">{stats?.totalOrders || 3}</span>
+                  <span className="text-2xl font-bold text-blue-600">{analytics?.emailEngagement || 0}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -635,7 +680,7 @@ export default function AccountPage() {
                     </div>
                     <span className="text-sm text-gray-700">Social Media Engagement</span>
                   </div>
-                  <span className="text-2xl font-bold text-green-600">{stats?.totalOrders ? stats.totalOrders * 2 : 12}</span>
+                  <span className="text-2xl font-bold text-green-600">{analytics?.socialMediaEngagement || 0}</span>
                 </div>
               </div>
             </div>
