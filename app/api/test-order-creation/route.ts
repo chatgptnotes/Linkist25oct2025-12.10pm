@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Create a test order with minimal data
     const testOrder = {
-      orderNumber: generateOrderNumber(),
+      orderNumber: await generateOrderNumber(), // Uses default 'nfc-card-full' plan type
       status: 'confirmed' as const,
       customerName: 'Test Customer',
       email: 'test@example.com',
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     console.log('📦 [test-order-creation] Request body:', body);
 
     const testOrder = {
-      orderNumber: generateOrderNumber(),
+      orderNumber: await generateOrderNumber(), // Uses default 'nfc-card-full' plan type
       status: body.status || 'confirmed' as const,
       customerName: body.customerName || 'Test Customer',
       email: body.email || 'test@example.com',

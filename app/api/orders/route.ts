@@ -33,8 +33,25 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Orders API: User created/updated:', user.id);
 
-    // Generate order number with LFND-XXXXXX prefix
-    const orderNumber = await generateOrderNumber();
+    // Determine plan type for order ID generation
+    const baseMaterial = body.cardConfig?.baseMaterial;
+    const isDigitalOnly = body.cardConfig?.isDigitalOnly;
+    const totalAmount = body.pricing?.total || 0;
+
+    let planType: 'digital-only' | 'digital-profile-app' | 'nfc-card-full' = 'nfc-card-full';
+
+    if (isDigitalOnly && totalAmount === 0) {
+      planType = 'digital-only';
+    } else if (baseMaterial === 'digital' || isDigitalOnly) {
+      planType = 'digital-profile-app';
+    } else {
+      planType = 'nfc-card-full';
+    }
+
+    console.log('📋 Orders API: Determined plan type:', planType);
+
+    // Generate order number with plan-specific prefix
+    const orderNumber = await generateOrderNumber(planType);
 
     // Create order object
     const orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {

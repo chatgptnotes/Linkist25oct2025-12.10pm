@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseOrderStore, generateOrderNumber } from '@/lib/supabase-order-store';
+import { SupabaseOrderStore, generateOrderNumber, OrderPlanType } from '@/lib/supabase-order-store';
 import { SupabaseUserStore } from '@/lib/supabase-user-store';
 import { SupabasePaymentStore } from '@/lib/supabase-payment-store';
 import { SupabaseShippingAddressStore } from '@/lib/supabase-shipping-address-store';
@@ -161,9 +161,28 @@ export async function POST(request: NextRequest) {
       // Create new order
       console.log(`📝 [process-order] Creating new order in database with status: ${orderStatus}...`);
 
+      // Determine plan type for order ID generation
+      let planType: OrderPlanType = 'nfc-card-full'; // Default: NFC Card + Digital Profile + Linkist App
+
+      // Check if it's a digital-only order (free tier)
+      if (cardConfig.isDigitalOnly && totalAmount === 0) {
+        planType = 'digital-only';
+        console.log('📋 [process-order] Plan type: Digital Only (FREE)');
+      }
+      // Check if it's digital profile + app (digital with subscription)
+      else if (cardConfig.baseMaterial === 'digital' && (cardConfig.isDigitalOnly || totalAmount > 0)) {
+        planType = 'digital-profile-app';
+        console.log('📋 [process-order] Plan type: Digital Profile + Linkist App');
+      }
+      // Physical NFC card + digital profile + app
+      else {
+        planType = 'nfc-card-full';
+        console.log('📋 [process-order] Plan type: NFC Digital Card + Digital Profile + Linkist App');
+      }
+
       try {
         order = await SupabaseOrderStore.create({
-          orderNumber: await generateOrderNumber(),
+          orderNumber: await generateOrderNumber(planType),
           userId: user.id, // Link order to user
           status: orderStatus,
           customerName: checkoutData.fullName,

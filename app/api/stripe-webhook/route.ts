@@ -119,8 +119,26 @@ async function handlePaymentSuccess(paymentIntent: any) {
       email: user.email
     });
 
-    // Generate order number
-    const orderNumber = await generateOrderNumber();
+    // Determine plan type for order ID generation
+    // Stripe webhook typically processes paid orders (Digital Profile + App or NFC Card)
+    const baseMaterial = paymentIntent.metadata?.baseMaterial || 'pvc';
+    const isDigitalOnly = paymentIntent.metadata?.isDigitalOnly === 'true';
+    const totalAmount = paymentIntent.amount / 100;
+
+    let planType: 'digital-only' | 'digital-profile-app' | 'nfc-card-full' = 'nfc-card-full';
+
+    if (isDigitalOnly && totalAmount === 0) {
+      planType = 'digital-only';
+    } else if (baseMaterial === 'digital' || isDigitalOnly) {
+      planType = 'digital-profile-app';
+    } else {
+      planType = 'nfc-card-full';
+    }
+
+    console.log('📋 [stripe-webhook] Determined plan type:', planType);
+
+    // Generate order number with plan-specific prefix
+    const orderNumber = await generateOrderNumber(planType);
 
     // Create order in database
     const order = await SupabaseOrderStore.create({
@@ -136,7 +154,9 @@ async function handlePaymentSuccess(paymentIntent: any) {
         title: paymentIntent.metadata?.title || 'Professional',
         mobile: paymentIntent.metadata?.mobile,
         whatsapp: paymentIntent.metadata?.whatsapp === 'true',
-        quantity: parseInt(paymentIntent.metadata?.quantity || '1')
+        quantity: parseInt(paymentIntent.metadata?.quantity || '1'),
+        baseMaterial: baseMaterial,
+        isDigitalOnly: isDigitalOnly
       },
       shipping: {
         fullName: paymentIntent.metadata?.shippingName || paymentIntent.metadata?.customerName || 'Customer',

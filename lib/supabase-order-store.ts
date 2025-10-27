@@ -383,29 +383,30 @@ export const SupabaseOrderStore = {
   },
 }
 
-// Generate a sequential order number using database sequence
-export const generateOrderNumber = async (): Promise<string> => {
-  const supabase = createAdminClient()
+// Plan types for order ID generation
+export type OrderPlanType = 'digital-only' | 'digital-profile-app' | 'nfc-card-full';
 
-  try {
-    // Call the database function to generate the next order number
-    const { data, error } = await supabase
-      .rpc('generate_order_number')
+// Generate a cryptic order number based on plan type
+// Digital Only: LKFM-DO-{cryptic}
+// Digital Profile + Linkist App: LKFM-DPLA-{cryptic}
+// NFC Digital Card + Digital Profile + Linkist App: LKFM-CDPLA-{cryptic}
+export const generateOrderNumber = async (planType: OrderPlanType = 'nfc-card-full'): Promise<string> => {
+  // Generate cryptic number using industry best practices
+  // Combine timestamp (6 chars) + random (4 chars) = 10 character cryptic string
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const cryptic = `${timestamp}${random}`;
 
-    if (error) {
-      console.error('Error generating order number:', error)
-      // Fallback to timestamp-based order number if sequence fails
-      const timestamp = Date.now().toString(36).toUpperCase()
-      return `LFND-${timestamp}`
-    }
+  // Determine prefix based on plan type
+  let prefix = 'LKFM-CDPLA'; // Default: NFC Card + Digital Profile + Linkist App
 
-    return data as string
-  } catch (err) {
-    console.error('Exception generating order number:', err)
-    // Fallback to timestamp-based order number
-    const timestamp = Date.now().toString(36).toUpperCase()
-    return `LFND-${timestamp}`
+  if (planType === 'digital-only') {
+    prefix = 'LKFM-DO';
+  } else if (planType === 'digital-profile-app') {
+    prefix = 'LKFM-DPLA';
   }
+
+  return `${prefix}-${cryptic}`;
 }
 
 // Export the same interface for easy migration
