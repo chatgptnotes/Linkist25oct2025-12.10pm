@@ -350,11 +350,11 @@ export default function CheckoutPage() {
     };
     const materialPrice = cardConfig?.baseMaterial ? materialPrices[cardConfig.baseMaterial] || 69 : 69;
 
-    // Only Material Price + App Subscription (no product plan)
+    // Only Material Price (no app subscription shown on checkout page)
     const productPlanPrice = 0; // Removed
-    const appSubscriptionPrice = APP_SUBSCRIPTION_PRICE;
+    const appSubscriptionPrice = 0; // Not shown on checkout page
     const basePrice = materialPrice; // Only material price
-    const subtotal = (basePrice + appSubscriptionPrice) * quantity;
+    const subtotal = basePrice * quantity;
 
     // Tax logic: 18% GST for India, 5% VAT for others (applied only on physical items, not subscription)
     const isIndia = watchedValues.country === 'IN';
@@ -366,10 +366,9 @@ export default function CheckoutPage() {
     const shippingCost = 0;
     const totalBeforeDiscount = subtotal + taxAmount + shippingCost;
 
-    // Apply voucher discount - always use the discount amount from API
-    // The API calculates the correct amount based on voucher type (fixed or percentage)
-    const discountAmount = voucherDiscountAmount > 0 ? voucherDiscountAmount : 0;
-    const total = Math.max(0, totalBeforeDiscount - discountAmount);
+    // No voucher discount on checkout page - vouchers only apply on payment page
+    const discountAmount = 0;
+    const total = totalBeforeDiscount;
 
     return {
       productPlanPrice,
@@ -606,18 +605,18 @@ export default function CheckoutPage() {
         pricing: {
           productPlanPrice: pricing.productPlanPrice,
           materialPrice: pricing.materialPrice,
-          appSubscriptionPrice: pricing.appSubscriptionPrice,
+          appSubscriptionPrice: APP_SUBSCRIPTION_PRICE, // Send actual subscription price to payment page
           basePrice: pricing.basePrice,
           subtotal: pricing.subtotal,
           shippingCost: pricing.shippingCost,
           taxAmount: pricing.taxAmount,
           totalBeforeDiscount: pricing.totalBeforeDiscount,
-          discountAmount: pricing.discountAmount,
+          discountAmount: 0, // No discount on checkout
           total: pricing.total,
           taxRate: pricing.taxRate,
           taxLabel: pricing.taxLabel,
-          voucherCode: voucherCode || null,
-          voucherDiscount: voucherDiscount || 0
+          voucherCode: null, // Payment page handles vouchers
+          voucherDiscount: 0 // Payment page handles vouchers
         },
         isFounderMember: formData.isFounderMember
       };
