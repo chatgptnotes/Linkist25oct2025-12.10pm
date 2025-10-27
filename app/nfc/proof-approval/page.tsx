@@ -297,10 +297,10 @@ export default function ProofApprovalPage() {
                     )}
                     {cardConfig.backgroundImage && (
                       <div>
-                        <p className="text-sm text-gray-600 mb-2">Background Image</p>
+                        <p className="text-sm text-gray-600 mb-2">Banner Image</p>
                         <img
                           src={cardConfig.backgroundImage}
-                          alt="Background"
+                          alt="Banner"
                           className="w-20 h-12 rounded object-cover border"
                         />
                       </div>

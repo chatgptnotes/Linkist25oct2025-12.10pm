@@ -1159,7 +1159,7 @@ function ProfileBuilderContent() {
     { id: 'basic' as const, icon: Person, label: 'Basic Information', description: 'Update your personal details and contact preferences' },
     { id: 'professional' as const, icon: Briefcase, label: 'Professional Information', description: 'Build your professional presence and showcase your expertise' },
     { id: 'social' as const, icon: Share, label: 'Social & Digital Presence', description: 'Connect your social media accounts and showcase your digital footprint' },
-    { id: 'media-photo' as const, icon: Camera, label: 'Profile Photo & Background', description: 'Upload and customize your profile visuals for a professional appearance' }
+    { id: 'media-photo' as const, icon: Camera, label: 'Profile Photo & Banner', description: 'Upload and customize your profile visuals for a professional appearance' }
   ];
 
   return (
@@ -2321,7 +2321,7 @@ function ProfileBuilderContent() {
               </div>
             )}
 
-            {/* Profile Photo & Background Section */}
+            {/* Profile Photo & Banner Section */}
             {activeSection === 'media-photo' && (
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
                 <div className="p-6 space-y-8">
@@ -2429,10 +2429,10 @@ function ProfileBuilderContent() {
                     </div>
                   </div>
 
-                  {/* Background Image */}
+                  {/* Banner Image */}
                   <div>
                     <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Background Image</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Banner Image</h3>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
@@ -2440,7 +2440,7 @@ function ProfileBuilderContent() {
                         <div className="bg-gray-200 rounded-lg overflow-hidden relative" style={{ aspectRatio: '16/9' }}>
                           {profileData.backgroundImage ? (
                             <>
-                              <img src={profileData.backgroundImage} alt="Background" className="w-full h-full object-cover" />
+                              <img src={profileData.backgroundImage} alt="Banner" className="w-full h-full object-cover" />
                               <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 hover:opacity-100">
                                 <input
                                   type="file"
@@ -2473,7 +2473,7 @@ function ProfileBuilderContent() {
                                   style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
                                 >
                                   <Upload className="w-4 h-4" />
-                                  Change Background
+                                  Change Banner
                                 </button>
                               </div>
                             </>
@@ -2511,7 +2511,7 @@ function ProfileBuilderContent() {
                                   style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
                                 >
                                   <Upload className="w-4 h-4" />
-                                  Upload Background
+                                  Upload Banner
                                 </button>
                                 <p className="text-xs mt-2 text-gray-500">JPG or PNG up to 15MB</p>
                               </div>
@@ -2522,7 +2522,7 @@ function ProfileBuilderContent() {
 
                       <div>
                         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                          <h4 className="font-semibold text-gray-900 text-sm mb-3">Background Guidelines</h4>
+                          <h4 className="font-semibold text-gray-900 text-sm mb-3">Banner Guidelines</h4>
                           <ul className="space-y-2 text-sm text-gray-700">
                             <li className="flex items-start gap-2">
                               <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
