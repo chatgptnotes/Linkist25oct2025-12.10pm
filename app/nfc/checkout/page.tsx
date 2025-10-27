@@ -104,6 +104,7 @@ export default function CheckoutPage() {
   const [voucherCode, setVoucherCode] = useState('LINKISTFM'); // Pre-fill with LINKISTFM
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0); // Actual capped discount amount from API
+  const [voucherType, setVoucherType] = useState<'fixed' | 'percentage'>('fixed'); // Track voucher type
   const [voucherValid, setVoucherValid] = useState<boolean | null>(null);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
   const [autoAppliedVoucher, setAutoAppliedVoucher] = useState(false);
@@ -142,6 +143,7 @@ export default function CheckoutPage() {
           setVoucherCode(voucherState.voucherCode);
           setVoucherDiscount(voucherState.voucherDiscount || 0);
           setVoucherDiscountAmount(voucherState.voucherDiscountAmount || 0);
+          setVoucherType(voucherState.voucherType || 'fixed');
           setVoucherValid(voucherState.voucherValid || false);
           console.log('Checkout: Restored voucher state from localStorage:', voucherState);
         }
@@ -279,8 +281,9 @@ export default function CheckoutPage() {
             if (voucherData.valid && voucherData.voucher) {
               setVoucherDiscount(voucherData.voucher.discount_value);
               setVoucherDiscountAmount(voucherData.voucher.discount_amount || 0);
+              setVoucherType(voucherData.voucher.discount_type || 'fixed');
               setVoucherValid(true);
-              console.log('✅ LINKISTFM voucher auto-applied:', voucherData.voucher.discount_value, 'Max amount:', voucherData.voucher.discount_amount);
+              console.log('✅ LINKISTFM voucher auto-applied:', voucherData.voucher.discount_value, 'Type:', voucherData.voucher.discount_type, 'Amount:', voucherData.voucher.discount_amount);
             }
           }
           setApplyingVoucher(false);
@@ -301,6 +304,7 @@ export default function CheckoutPage() {
         voucherCode,
         voucherDiscount,
         voucherDiscountAmount,
+        voucherType,
         voucherValid: true,
       };
       localStorage.setItem('checkoutVoucherState', JSON.stringify(voucherState));
@@ -309,7 +313,7 @@ export default function CheckoutPage() {
       // Clear saved voucher if validation failed
       localStorage.removeItem('checkoutVoucherState');
     }
-  }, [voucherValid, voucherCode, voucherDiscount, voucherDiscountAmount]);
+  }, [voucherValid, voucherCode, voucherDiscount, voucherDiscountAmount, voucherType]);
 
   const calculatePricing = () => {
     // Get price based on selected material
@@ -338,11 +342,9 @@ export default function CheckoutPage() {
     const shippingCost = 0;
     const totalBeforeDiscount = subtotal + taxAmount + shippingCost;
 
-    // Apply voucher discount - use the capped amount from API if available
-    // Otherwise calculate from percentage (for backward compatibility)
-    const discountAmount = voucherDiscountAmount > 0
-      ? voucherDiscountAmount
-      : (totalBeforeDiscount * voucherDiscount) / 100;
+    // Apply voucher discount - always use the discount amount from API
+    // The API calculates the correct amount based on voucher type (fixed or percentage)
+    const discountAmount = voucherDiscountAmount > 0 ? voucherDiscountAmount : 0;
     const total = Math.max(0, totalBeforeDiscount - discountAmount);
 
     return {
@@ -382,18 +384,16 @@ export default function CheckoutPage() {
       const result = await response.json();
 
       if (result.valid && result.voucher) {
-        // Calculate discount percentage for display
-        const discountPercent = result.voucher.discount_type === 'percentage'
-          ? result.voucher.discount_value
-          : Math.round((result.voucher.discount_amount / (pricing.totalBeforeDiscount || 1)) * 100);
-
-        setVoucherDiscount(discountPercent);
-        // Store the actual capped discount amount from API
+        // Store voucher details from API
+        setVoucherDiscount(result.voucher.discount_value);
         setVoucherDiscountAmount(result.voucher.discount_amount || 0);
+        setVoucherType(result.voucher.discount_type || 'fixed');
         setVoucherValid(true);
+        console.log('✅ Voucher applied:', result.voucher.discount_type, result.voucher.discount_value, 'Amount:', result.voucher.discount_amount);
       } else {
         setVoucherDiscount(0);
         setVoucherDiscountAmount(0);
+        setVoucherType('fixed');
         setVoucherValid(false);
         alert('Invalid voucher code');
       }
@@ -1050,7 +1050,7 @@ export default function CheckoutPage() {
                         </svg>
                         <div className="text-sm">
                           <p className="font-bold text-yellow-900">Founding Member Discount Applied!</p>
-                          <p className="text-yellow-800 mt-1">Your exclusive {voucherDiscount}% discount has been automatically applied.</p>
+                          <p className="text-yellow-800 mt-1">Your exclusive {voucherType === 'percentage' ? `${voucherDiscount}%` : `$${voucherDiscount}`} discount has been automatically applied.</p>
                         </div>
                       </div>
                     </div>
@@ -1060,7 +1060,7 @@ export default function CheckoutPage() {
                 {/* Discount Line */}
                 {voucherDiscount > 0 && voucherValid && (
                   <div className="flex justify-between text-green-600 font-medium">
-                    <span>Voucher Discount ({voucherDiscount}% off)</span>
+                    <span>Voucher Discount ({voucherType === 'percentage' ? `${voucherDiscount}%` : `$${voucherDiscount}`} off)</span>
                     <span>-${pricing.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
