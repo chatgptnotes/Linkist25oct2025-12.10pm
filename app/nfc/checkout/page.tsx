@@ -934,22 +934,13 @@ export default function CheckoutPage() {
                 {/* Front Card */}
                 <div className="mb-4">
                   <div className={`w-56 aspect-[1.6/1] bg-gradient-to-br ${getCardGradient()} rounded-xl relative overflow-hidden shadow-lg mr-auto`}>
-                    {/* AI Icon top right - Changes based on card color */}
-                    <div className="absolute top-3 right-3">
-                      <div
-                        className={`rounded-lg p-2 shadow-md ${
-                          cardConfig?.color === 'white'
-                            ? 'bg-white'
-                            : 'bg-gray-900'
-                        }`}
-                      >
-                        <img
-                          src={cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
-                          alt="AI"
-                          className={`w-4 h-4 ${cardConfig?.color === 'white' ? '' : 'invert'}`}
-                        />
-                      </div>
-                    </div>
+                    {/* AI Icon top right - No wrapper, no background, no shadow */}
+                    <img
+                      src={cardConfig?.color === 'white' ? '/ai2.png' : '/ai1.png'}
+                      alt="AI"
+                      className={`absolute top-3 right-3 w-4 h-4 ${cardConfig?.color === 'white' ? '' : 'invert'}`}
+                      style={{ boxShadow: 'none', background: 'transparent' }}
+                    />
 
                     {/* User Name or Initials */}
                     <div className="absolute bottom-4 left-4">

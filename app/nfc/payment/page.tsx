@@ -1016,13 +1016,14 @@ export default function NFCPaymentPage() {
                       <button
                         type="button"
                         onClick={validateVoucher}
-                        disabled={applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')}
+                        disabled={applyingVoucher || !voucherCode.trim() || voucherValid === true}
                         style={{
-                          backgroundColor: (applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')) ? '#d1d5db' : '#dc2626',
+                          backgroundColor: (applyingVoucher || !voucherCode.trim() || voucherValid === true) ? '#d1d5db' : '#dc2626',
                           color: '#ffffff',
-                          opacity: (applyingVoucher || !voucherCode.trim() || (voucherValid === true && appliedVoucherCode !== '')) ? 0.6 : 1
+                          opacity: (applyingVoucher || !voucherCode.trim() || voucherValid === true) ? 0.6 : 1,
+                          cursor: (applyingVoucher || !voucherCode.trim() || voucherValid === true) ? 'not-allowed' : 'pointer'
                         }}
-                        className="px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap cursor-pointer"
+                        className="px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap"
                       >
                         {applyingVoucher ? 'Applying...' : 'Apply'}
                       </button>
