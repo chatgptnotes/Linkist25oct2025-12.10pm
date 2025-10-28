@@ -312,13 +312,6 @@ export default function ProfilePreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simple Logo-only Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
-          <Logo width={140} height={45} variant="light" />
-        </div>
-      </div>
-
       {/* Profile Card */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Profile Preview Header with Actions */}
